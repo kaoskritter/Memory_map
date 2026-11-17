@@ -117,6 +117,10 @@ await step('owner deletes the map and nothing is left behind', async () => {
   assert.equal(mock.files.size, 0, 'photo files removed');
 });
 await step('sign out returns to the sign-in screen', async () => { await helen.click('[data-act=signout]'); await helen.waitForSelector('#si-email'); });
+await step('an expired email link gets a plain explanation', async () => {
+  await helen.goto(web + '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'); await helen.waitForSelector('.notice');
+  assert.match(await helen.textContent('.notice'), /expired or was already used/);
+});
 await step('phone width has no sideways scrolling', async () => {
   await nobody.setViewportSize({ width: 390, height: 800 }); await nobody.waitForTimeout(200);
   assert.equal(await nobody.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await nobody.screenshot({ path: join(shots, 'phone.png') });

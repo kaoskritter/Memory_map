@@ -503,12 +503,15 @@ window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
 
 /* ---------- start ---------- */
 document.documentElement.dataset.size = prefs.size || 'normal';
+// A used or expired email link comes back with an error in the address; say so plainly.
+let linkProblem = /error_code=|error=access_denied/.test(location.hash) ? 'That sign-in link has expired or was already used. Enter your email and we will send a fresh one.' : '';
+if (linkProblem) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ } }
 if (!sb) gateSignIn();
 else {
   showGate(`${brand}<p>One moment…</p>`);
   sb.auth.onAuthStateChange((event, session) => {
     const next = session ? session.user : null;
     if (next && (!user || user.id !== next.id)) { user = next; setTimeout(afterSignIn, 0); }   // defer: no Supabase calls inside the callback
-    else if (!next && (user || event === 'INITIAL_SESSION')) { user = null; if (!(S && S.demo)) { S = null; gateSignIn(); } }
+    else if (!next && (user || event === 'INITIAL_SESSION')) { user = null; if (!(S && S.demo)) { S = null; gateSignIn(linkProblem); linkProblem = ''; } }
   });
 }
