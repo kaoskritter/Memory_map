@@ -161,6 +161,36 @@ await step('owner changes a place and removes its photo', async () => {
   await helen.waitForFunction(() => /blue house/.test(document.querySelector('.entry')?.textContent || ''));
   assert.equal((await mock.db.query(`select count(*)::int n from photos`)).rows[0].n, 1); assert.equal(mock.files.size, 1);
 });
+await step('two owners connect their maps and see where their paths crossed; invited family see none of it', async () => {
+  await mock.db.query(`insert into beta_allowlist(email) values ('sam@example.com')`);
+  const sam = await person('sam'); await signIn(sam, 'sam@example.com'); await sam.waitForSelector('#newform');
+  await sam.fill('#nw-name', 'Sam Green'); await sam.fill('#nw-you', 'Sam'); await sam.click('#newform button[type=submit]'); await sam.waitForSelector('.sechead');
+  // Sam's corner shop sits right by Helen's Electra Street, in overlapping years
+  const e = (await mock.db.query(`select lat, lng from events where title like 'Electra Street%'`)).rows[0];
+  await mock.db.query(`insert into events(map_id, category, title, lat, lng, when_text, year_from, year_to, addr) select id, 'work', 'Corner shop', $1, $2, '1962 to 1970', 1962, 1970, '{"street":"9 Private Lane","town":"Williamstown"}' from maps where preferred_name='Sam Green'`, [e.lat + 0.002, e.lng]);
+  // Helen asks
+  await helen.goto(web); await helen.waitForSelector('[data-act=settings]'); await helen.click('[data-act=settings]'); await helen.waitForSelector('#cn-email');
+  await helen.fill('#cn-email', 'Sam@Example.com'); await helen.click('#connform button[type=submit]'); await helen.waitForSelector('#settings .notice');
+  assert.match(await helen.textContent('#settings'), /waiting for them to say yes/); await helen.click('#settings [data-act=close]');
+  assert.ok(await helen.locator('.tab[data-v=paths]').isHidden(), 'nothing shared until Sam says yes');
+  // Sam is told, and says yes
+  await sam.goto(web); await sam.waitForFunction(() => /would like to connect/.test(document.querySelector('#toast')?.textContent || ''));
+  await sam.click('[data-act=settings]'); await sam.waitForSelector('[data-act=acceptconn]'); await sam.click('[data-act=acceptconn]');
+  await sam.waitForFunction(() => /Connected/.test(document.querySelector('#settings')?.textContent || '')); await sam.click('#settings [data-act=close]');
+  await sam.click('.tab[data-v=paths]'); await sam.waitForSelector('.crossing'); assert.match(await sam.textContent('#paths'), /Corner shop[\s\S]*Electra Street/);
+  // Helen sees it too: places and dates, never memories or street addresses
+  await helen.goto(web); await helen.waitForSelector('.tab[data-v=paths]:not([hidden])'); await helen.click('.tab[data-v=paths]'); await helen.waitForSelector('.crossing');
+  const txt = await helen.textContent('#paths'); assert.match(txt, /Electra Street[\s\S]*Corner shop/); assert.match(txt, /At the same place/); assert.doesNotMatch(txt, /Private Lane/);
+  await helen.screenshot({ path: join(shots, 'paths.png') });
+  // invited family on Helen's map see no connection at all
+  await tom.goto(web); await tom.waitForSelector('.tab[data-v=family]'); await tom.waitForTimeout(300); assert.ok(await tom.locator('.tab[data-v=paths]').isHidden());
+  // Sam disconnects, and sharing stops for both
+  await sam.click('[data-act=settings]'); await sam.waitForSelector('[data-act=delconn]'); await sam.click('[data-act=delconn]');
+  await sam.waitForFunction(() => /Not connected to anyone yet/.test(document.querySelector('#settings')?.textContent || '')); await sam.click('#settings [data-act=close]');
+  await helen.goto(web); await helen.waitForSelector('.card'); assert.ok(await helen.locator('.tab[data-v=paths]').isHidden());
+  await mock.db.query(`delete from maps where preferred_name='Sam Green'`);
+  await helen.click('[data-v=both]');
+});
 await step('removing the invite ends the relative’s access', async () => {
   await helen.click('[data-act=settings]'); await helen.waitForSelector('[data-act=delinvite]'); await helen.click('[data-act=delinvite]');
   await helen.waitForFunction(() => !document.querySelector('[data-act=delinvite]')); await helen.click('#settings [data-act=close]');

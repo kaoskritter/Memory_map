@@ -7,7 +7,8 @@ import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 import { CATS, CAT } from './categories.js';
 import { parseWhen } from './when.js';
-import { sample } from './sample.js';
+import { sample, sampleConnection } from './sample.js';
+import { crossings, yearsLabel, distanceLabel } from './paths.js';
 import { relations, layout, relationLabel, linksFor, sameLink } from './family.js';
 import { sb, demoStore, cloudStore, listMaps, acceptInvites, createMap, loadMap } from './store.js';
 
@@ -17,7 +18,7 @@ const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)
 const TILE_URL = import.meta.env.VITE_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTR = import.meta.env.VITE_TILE_ATTRIBUTION || '© OpenStreetMap contributors';
 const GEOCODE_URL = import.meta.env.VITE_GEOCODE_URL || 'https://nominatim.openstreetmap.org/search';
-const VIEWS = ['map', 'timeline', 'both', 'photos', 'family', 'edit'];
+const VIEWS = ['map', 'timeline', 'both', 'photos', 'family', 'paths', 'edit'];
 const badge = (cat) => { const c = CAT[cat]; return `<span class="badge" style="--c:${c.c}" aria-hidden="true"><svg viewBox="0 0 24 24">${c.i}</svg></span>`; };
 
 /* ---------- preferences kept on this device only ---------- */
@@ -103,9 +104,20 @@ async function afterSignIn() {
 async function openMap(id) {
   showGate(`${brand}<p>Opening your Memory Map…</p>`);
   S = await loadMap(id, user.id); store = cloudStore(id, user.id);
+  await loadConnections();
   prefs.lastMap = id; savePrefs(); enterApp(S.events.length ? prefs.view : (owner() ? 'edit' : 'both'));
+  const asks = S.connections.filter((c) => c.direction === 'received' && !c.accepted);
+  if (asks.length) toast(`${asks[0].other_name || asks[0].other_email} would like to connect their Memory Map with this one. Open Settings to say yes or no.`);
 }
-function openDemo() { S = sample(); store = demoStore(); enterApp('both'); }
+function openDemo() { S = sample(); store = demoStore(); const c = sampleConnection(); S.connections = c.connections; S.others = c.places; enterApp('both'); }
+// Only the owner of a map sees connected maps, and only their places.
+async function loadConnections() {
+  S.connections = []; S.others = [];
+  if (!owner()) return;
+  try { S.connections = await store.listConnections(); S.others = await store.connectedPlaces(); } catch (e) { console.warn('connections', e.message || e); }
+}
+const connectedMaps = () => { const m = new Map(); (S.others || []).forEach((p) => { if (!m.has(p.mapId)) m.set(p.mapId, p.mapName || 'Their'); }); return [...m].map(([id, name]) => ({ id, name })); };
+let pathsWith = null;
 function enterApp(view) {
   sel = null; hot = null; openSec = S.events.length ? null : 'about'; editing = null; draft = null; fitted = false;
   document.body.dataset.screen = 'app'; S.view = view;
@@ -127,6 +139,7 @@ function renderTop() {
   $('#sample').hidden = !S.demo;
   document.body.dataset.view = S.view; document.body.dataset.mode = S.mode;
   document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === S.view)));
+  const pt = document.querySelector('.tab[data-v=paths]'); if (pt) pt.hidden = !connectedMaps().length;
   document.title = (s.preferred ? s.preferred + ' · ' : '') + 'Memory Map';
 }
 function renderFilters() {
@@ -140,7 +153,7 @@ function renderFilters() {
 /* =====================================================================
    Map
    ===================================================================== */
-let map, markers = {}, pathLine = null;
+let map, markers = {}, otherMarkers = {}, pathLine = null;
 const pinIcon = (cat) => { const c = CAT[cat]; return L.divIcon({ className: '', html: `<div class="pin" style="--c:${c.c}"><svg viewBox="0 0 24 24">${c.i}</svg></div>`, iconSize: [46, 46], iconAnchor: [23, 23] }); };
 const tiles = (m) => L.tileLayer(TILE_URL, { maxZoom: 19, attribution: TILE_ATTR }).addTo(m);
 function initMap() {
@@ -161,6 +174,13 @@ function renderMap() {
   if (pathLine) { pathLine.remove(); pathLine = null; }
   const stops = prefs.path ? visible().filter((e) => e.lat != null && range(e)) : [];
   if (stops.length > 1) pathLine = L.polyline(stops.map((e) => [e.lat, e.lng]), { color: '#1B2A41', weight: 4, opacity: 0.75, dashArray: '1 10', lineCap: 'round', interactive: false }).addTo(map);
+  // Their places, on the "Paths crossed" view only: outlined pins that show a label but open nothing.
+  Object.values(otherMarkers).forEach((m) => m.remove()); otherMarkers = {};
+  if (S.view === 'paths') theirPlaces().filter((p) => p.lat != null).forEach((p) => {
+    const c = CAT[p.cat] || CAT.life, m = L.marker([p.lat, p.lng], { title: `${p.title} (${first(p.mapName)}’s place)`, alt: p.title, icon: L.divIcon({ className: '', html: `<div class="pin other"><svg viewBox="0 0 24 24">${c.i}</svg></div>`, iconSize: [40, 40], iconAnchor: [20, 20] }) }).addTo(map);
+    m.bindTooltip(`<b>${esc(p.title)}</b><br>${esc(first(p.mapName))}’s place · ${esc(p.when || 'Not sure when')}`, { direction: 'top', offset: [0, -16] });
+    otherMarkers[p.id] = m;
+  });
   paint();
 }
 function fitHome() {
@@ -176,6 +196,41 @@ function paint() {
   document.querySelectorAll('.card').forEach((c) => c.classList.toggle('hot', c.dataset.id === hot && c.dataset.id !== sel));
 }
 function setHot(id) { hot = id; paint(); }
+
+/* =====================================================================
+   Where our paths crossed
+   ===================================================================== */
+function theirPlaces() { const ms = connectedMaps(); if (!ms.length) return []; if (!ms.some((m) => m.id === pathsWith)) pathsWith = ms[0].id; return S.others.filter((p) => p.mapId === pathsWith); }
+function myPlaces() { return S.events.filter(allowed).map((e) => { const r = range(e); return { id: e.id, title: e.title, lat: e.lat, lng: e.lng, from: r ? r.from : null, to: r ? r.to : null, town: (e.addr || {}).town || '', e }; }); }
+let crossed = [];
+function renderPaths() {
+  const box = $('#paths'); if (!box || !S) return;
+  const ms = connectedMaps(); if (!ms.length) { box.innerHTML = ''; return; }
+  const theirs = theirPlaces(), them = first(ms.find((m) => m.id === pathsWith).name), me = first(S.subject.preferred);
+  crossed = crossings(myPlaces(), theirs);
+  const same = crossed.filter((c) => c.kind === 'same'), near = crossed.filter((c) => c.kind === 'near');
+  const item = (c, i) => `<li><button class="crossing" data-act="crossing" data-i="${i}"><span class="yrs">${esc(yearsLabel(c.years))}</span><span class="pair"><b>${esc(c.mine.title)}</b><span class="amp">and</span><b class="theirs">${esc(c.theirs.title)}</b></span><span class="meta">${esc(distanceLabel(c.km))}</span></button></li>`;
+  const undated = myPlaces().filter((p) => p.from == null).length + theirs.filter((p) => p.from == null).length;
+  box.innerHTML = `<div class="pathshead"><h2>Where ${esc(me)}’s and ${esc(them)}’s paths crossed</h2>${ms.length > 1 ? `<div class="field"><label for="pw-map">Compare with</label><select id="pw-map">${ms.map((m) => `<option value="${m.id}"${m.id === pathsWith ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>` : ''}
+    <p class="meta"><span class="key mine"></span>Coloured pins are ${esc(me)}’s places. <span class="key theirs"></span>Outlined pins are ${esc(them)}’s. Tap a match below to see it on the map.</p><p class="meta">Only places and dates are shared. ${esc(them)}’s memories and photos stay private.</p></div>
+    ${crossed.length ? `${same.length ? `<h3>At the same place, at the same time</h3><ol class="crossings">${same.map((c) => item(c, crossed.indexOf(c))).join('')}</ol>` : ''}${near.length ? `<h3>Nearby, at the same time</h3><ol class="crossings">${near.map((c) => item(c, crossed.indexOf(c))).join('')}</ol>` : ''}`
+      : `<p class="empty">No crossings found yet. Places count when they’re within about 25 km of each other and the years overlap. Adding pins and rough dates (like “early 1960s”) helps.</p>`}
+    ${undated ? `<p class="meta">${undated} ${undated === 1 ? 'place has' : 'places have'} no date yet, so ${undated === 1 ? 'it isn’t' : 'they aren’t'} compared.</p>` : ''}`;
+}
+function showCrossing(i) {
+  const c = crossed[i]; if (!c) return;
+  document.querySelectorAll('.crossing').forEach((b) => b.classList.toggle('sel', b.dataset.i === String(i)));
+  sel = c.mine.id; renderPreview(); paint();
+  const pts = [c.mine, c.theirs].filter((p) => p.lat != null).map((p) => [p.lat, p.lng]);
+  if (map && pts.length) { const b = L.latLngBounds(pts).pad(0.6); reduce ? map.fitBounds(b, { maxZoom: 15 }) : map.flyToBounds(b, { maxZoom: 15, duration: 0.8 }); }
+  const om = otherMarkers[c.theirs.id]; if (om) setTimeout(() => om.openTooltip(), reduce ? 0 : 850);
+}
+// Frame the crossings if there are any; otherwise the usual home area.
+function fitPaths() {
+  if (!map) return; map.invalidateSize();
+  const pts = crossed.flatMap((c) => [c.mine, c.theirs]).filter((p) => p.lat != null).map((p) => [p.lat, p.lng]);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 13, animate: false }); else fitHome();
+}
 
 /* =====================================================================
    Timeline, preview, gallery
@@ -365,6 +420,15 @@ async function renderSettings(panel) {
         <form id="inviteform" class="field" style="gap:.5rem;margin-top:.6rem"><label for="iv-email">Invite someone by email</label><input id="iv-email" type="email" autocomplete="off" required><button class="btn" type="submit">Add them</button></form>${
         panel === 'invited' ? `<div class="notice"><p><b>Added.</b> Now let them know. Send them this, in your own words if you like:</p><p id="invtext">I’m putting together a Memory Map for ${esc(S.subject.preferred || 'our family')} and would love you to add your memories and photos. Go to ${esc(location.origin)} and sign in with this email address.</p><button class="btn" type="button" data-act="copyinvite">Copy this message</button></div>` : ''}</fieldset>`;
     }
+    if (!S.demo) {
+      const cs = S.connections || [], nm = (c) => esc(c.other_name || c.other_email);
+      const row = (c) => c.accepted ? `<div class="entry"><div class="t"><b>${nm(c)}</b><span>Connected</span></div><button class="btn quiet" data-act="delconn" data-id="${c.id}">Disconnect</button></div>`
+        : c.direction === 'received' ? `<div class="entry ask"><div class="t"><b>${esc(c.other_name || 'Someone')}</b><span>${esc(c.other_email)} would like to connect</span></div><div class="rowbtns"><button class="btn primary" data-act="acceptconn" data-id="${c.id}">Yes, connect</button><button class="btn quiet" data-act="delconn" data-id="${c.id}">No thanks</button></div></div>`
+        : `<div class="entry"><div class="t"><b>${esc(c.other_email)}</b><span>Asked, waiting for them to say yes</span></div><button class="btn quiet" data-act="delconn" data-id="${c.id}">Cancel</button></div>`;
+      h += `<fieldset><legend>Connected Memory Maps</legend><p class="hint">Connect with someone else who looks after a Memory Map, to see where your paths crossed. You each see the other’s places and dates only, never memories or photos. Either of you can disconnect at any time.</p>${cs.map(row).join('') || '<p>Not connected to anyone yet.</p>'}
+        <form id="connform" class="field" style="gap:.5rem;margin-top:.6rem"><label for="cn-email">Their email address</label><span class="hint">The one they use to sign in to Memory Map. They’ll need to say yes.</span><input id="cn-email" type="email" autocomplete="off" required><button class="btn" type="submit">Ask to connect</button></form>${
+        panel === 'connasked' ? '<div class="notice"><p><b>Asked.</b> When they next open Memory Map they’ll be asked to say yes. It might help to let them know.</p></div>' : ''}</fieldset>`;
+    }
   }
   h += '<div class="rowbtns">';
   if (!S.demo) {
@@ -382,6 +446,7 @@ function showPrivacy() {
    <li><b>Invited people can add, not rewrite.</b> They can add memories and photos. Only the person looking after the map can change places and dates.</li>
    <li><b>Where it is kept.</b> Places, memories and photos are stored with our hosting provider, Supabase, in Sydney, Australia. Photos are kept in private storage and are not public links.</li>
    <li><b>Maps.</b> The map pictures come from OpenStreetMap. If you press “Find it for me”, the address you typed is sent to OpenStreetMap to look it up. If you would rather not, tap the map to place the pin yourself.</li>
+   <li><b>Connected Memory Maps.</b> If the person looking after a Memory Map connects it with someone else’s, the two of them see each other’s places and dates only, never memories, photos or street addresses. Invited family don’t see the other map. Either side can disconnect at any time.</li>
    <li><b>Your copy.</b> You can download a copy of a Memory Map, or delete it completely, from Settings at any time.</li>
    <li><b>No advertising, no selling of information.</b></li>
    <li><b>This is an early version.</b> Please keep your own copies of precious photos.</li></ul></div>`;
@@ -571,14 +636,17 @@ async function savePerson() {
 /* =====================================================================
    Wiring
    ===================================================================== */
-function refresh() { renderTop(); renderFilters(); renderMap(); renderTimeline(); renderPreview(); renderGallery(); renderFamily(); }
+function refresh() { renderTop(); renderFilters(); renderMap(); renderTimeline(); renderPreview(); renderGallery(); renderFamily(); renderPaths(); }
 function setView(v) {
   if (v === 'edit' && !owner()) v = 'both';
+  if (v === 'paths' && !connectedMaps().length) v = 'both';
+  const wasPaths = S.view === 'paths';
   S.view = v; if (v !== 'edit') { prefs.view = v; savePrefs(); }
   renderTop();
   if (v === 'edit') { renderEdit(); $('#edit').scrollTop = 0; } else { editing = null; draft = null; }
   if (map && v !== 'edit') setTimeout(() => { map.invalidateSize(); if (!fitted) { fitHome(); fitted = true; } }, 30);
   if (v === 'family') { renderFamily(); setTimeout(centreFamily, 0); }
+  if (v === 'paths' || wasPaths) { renderMap(); renderPaths(); if (v === 'paths') { fitted = true; setTimeout(fitPaths, 60); } }
   try { if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v); } catch (e) { /* ignore */ }
 }
 function saveAbout(a, b) {
@@ -631,6 +699,9 @@ document.addEventListener('click', (ev) => {
     person: () => { document.querySelectorAll('#story[open]').forEach((d) => d.close()); openPerson(id); },
     relpanel: () => openPerson(id, 'add'),
     addfriend: () => openAddFriend(),
+    crossing: () => showCrossing(+b.dataset.i),
+    acceptconn: () => run(async () => { await store.acceptConnection(id); await loadConnections(); renderTop(); renderPaths(); renderSettings(); toast('Connected. Look for “Paths crossed” next to Family.'); }),
+    delconn: () => run(async () => { await store.removeConnection(id); await loadConnections(); if (S.view === 'paths' && !connectedMaps().length) setView('both'); renderTop(); renderSettings(); toast('Done.'); }),
     editperson: () => openPerson(id, 'edit'),
     askdelperson: () => openPerson(id, 'confirm'),
     delperson: () => run(async () => { const p = personById(id); await store.deletePerson(p); S.people = S.people.filter((x) => x.id !== id); S.links = S.links.filter((l) => l.from !== id && l.to !== id); S.events.forEach((e) => { e.who = (e.who || []).filter((x) => x !== id); }); personSel = null; $('#person').close(); renderFamily(); toast(pname(p) + (isFriend(p) ? ' has been removed from the friends.' : ' has been removed from the family tree.')); }),
@@ -647,6 +718,7 @@ document.addEventListener('click', (ev) => {
 document.addEventListener('change', (ev) => {
   const t = ev.target;
   if (t.name === 'rwho') { $('#r-newbox').hidden = t.value === 'old'; $('#r-oldbox').hidden = t.value !== 'old'; (t.value === 'old' ? $('#r-old') : $('#r-name')).focus(); return; }
+  if (t.id === 'pw-map') { pathsWith = t.value; renderMap(); renderPaths(); fitPaths(); return; }
   if (t.id === 'f-path') { prefs.path = t.checked; savePrefs(); renderMap(); }
   else if (t.dataset.f) { prefs.filters[t.dataset.f] = t.checked; savePrefs(); if (sel && !visible().some((e) => e.id === sel)) sel = null; renderMap(); renderTimeline(); renderPreview(); renderGallery(); }
   else if (t.name === 'prec') { readForm(); draft.precision = t.value; renderEdit(); $('#p-' + (t.value === 'approx' ? 'a' : 'd')).focus(); }
@@ -694,6 +766,12 @@ document.addEventListener('submit', (ev) => {
   });
   else if (f === 'relform') run(addRelative);
   else if (f === 'friendform') run(addFriend);
+  else if (f === 'connform') run(async () => {
+    const email = $('#cn-email').value.trim().toLowerCase(); if (!email) return;
+    try { await store.requestConnection(email); }
+    catch (e) { if (/duplicate|unique/i.test(e.message || '')) { toast('You have already asked that person.'); return; } if (/row-level|policy|violates/i.test(e.message || '')) { toast('That has to be someone else’s email address.'); return; } throw e; }
+    await loadConnections(); renderSettings('connasked');
+  });
   else if (f === 'personform') run(savePerson);
   else if (f === 'inviteform') run(async () => {
     const email = $('#iv-email').value.trim().toLowerCase();

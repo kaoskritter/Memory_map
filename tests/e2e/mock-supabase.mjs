@@ -27,7 +27,15 @@ export async function startMock(port) {
 
   async function rest(req, url, body, c) {
     const parts = url.pathname.split('/').filter(Boolean); // rest v1 table | rest v1 rpc fn
-    if (parts[2] === 'rpc') return asUser(c, async () => (await db.query(`select public.${ident(parts[3])}() as r`)).rows[0].r);
+    if (parts[2] === 'rpc') {
+      // named arguments from the JSON body; set-returning functions give rows, others a single value
+      const fn = ident(parts[3]), args = body && typeof body === 'object' ? Object.entries(body) : [];
+      const call = `public.${fn}(${args.map(([k], i) => `${ident(k)} => $${i + 1}`).join(', ')})`, vals = args.map(([, v]) => v);
+      return asUser(c, async () => {
+        const set = (await db.query(`select proretset from pg_proc where proname = $1 and pronamespace = 'public'::regnamespace`, [fn])).rows[0]?.proretset;
+        return set ? (await db.query(`select * from ${call}`, vals)).rows : (await db.query(`select ${call} as r`, vals)).rows[0].r;
+      });
+    }
     const table = ident(parts[2]), q = url.searchParams;
     const sel = (q.get('select') || '*').split(',').map((s) => s.trim()).map((s) => (s === '*' ? '*' : ident(s))).join(', ');
     const where = [], params = [];
