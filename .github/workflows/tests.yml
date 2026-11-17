@@ -1,0 +1,44 @@
+name: Tests
+
+# Runs on every pull request and every push to main.
+# main is protected: a change only reaches the live site once this passes.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit and access-rule tests
+        run: npm test
+
+      - name: Browser journey (against the mock Supabase)
+        run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+      - name: Keep screenshots if the browser journey fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screenshots
+          path: test-results/
+          retention-days: 7

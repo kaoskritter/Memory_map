@@ -15,16 +15,18 @@ Memory Map maps a person's life story across places and time: life events pinned
 - Static Vite app in plain JavaScript with Leaflet. No server of our own.
 - `src/main.js` is the interface; `src/store.js` holds every Supabase call; `src/when.js` reads rough dates; `src/family.js` lays out the family tree and names relationships.
 - Supabase (Sydney) provides sign-in, Postgres with row level security, and a private photo bucket. Schema and rules live in `supabase/migrations/`.
-- Hosted on Vercel; every push to `main` deploys to production.
+- Hosted on Vercel; every merge to `main` deploys to production, and every pull request gets its own preview link.
 
 ## Working rules
 
 - Database changes go in a new numbered file under `supabase/migrations/`. Never edit an applied migration.
-- Run `npm test` and `npm run test:e2e` before pushing. Add a test with any change to access rules.
+- `main` is protected: never push to it directly. Work on a branch, open a pull request, and merge once the **Tests** check (`.github/workflows/tests.yml`: `npm test` + `npm run test:e2e`) passes. Other chats may be working at the same time, so rebase on `main` before merging.
+- Run `npm test` and `npm run test:e2e` locally too. Add a test with any change to access rules.
+- Features are tracked as GitHub issues (`[MM-xx]` titles, matching the Google Sheet "Memory Map – Feature tracker", where Steph adds ideas). Labels: `status: …`, `area: …`, `priority: …`, `size: S/M/L`, `idea from Steph`. Put `Closes #N` in the pull request so the issue closes on merge, and copy new Sheet ideas into issues when they are picked up.
 - Never commit the Supabase `service_role` key. The publishable key is public by design.
 - If a new outside host is needed (map tiles, geocoder, fonts), add it to the Content-Security-Policy in `vercel.json`.
 - When sign-in misbehaves, read the Supabase auth logs first.
 
-## Status (17 Nov 2026)
+## Status (17 Nov 2026, evening)
 
-Deployed at https://memory-map-nine-sooty.vercel.app. A full real sign-in has not yet been completed. Email uses Supabase's built-in sender (about two emails an hour, default template); a sending domain with custom SMTP is the outstanding fix before inviting family.
+Deployed at https://memory-map-nine-sooty.vercel.app. Sign-in email goes through custom SMTP via Resend (`hello@memorymap.anuki.com.au`). Family tree, places and photos are not yet proven on a real signed-in map (issue #13).
