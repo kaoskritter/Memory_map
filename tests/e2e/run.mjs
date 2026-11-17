@@ -56,6 +56,17 @@ await step('the example can join its places in order and lay out a memory book',
   await nobody.screenshot({ path: join(shots, 'book.png') });
   await nobody.click('[data-act=closebook]'); await nobody.waitForSelector('#map', { state: 'visible' });
 });
+await step('the example family tree draws, names relationships, and links people to places', async () => {
+  await nobody.click('[data-v=family]'); await nobody.waitForSelector('.famtree .pcard.me');
+  assert.equal(await nobody.locator('.famtree .pcard').count(), 9);
+  assert.ok(await nobody.locator('.famtree svg path').count() >= 8, 'lines drawn');
+  await nobody.screenshot({ path: join(shots, 'family.png') });
+  await nobody.click('.pcard[title="Ted Lawson"]'); await nobody.waitForSelector('#person h2');
+  assert.match(await nobody.textContent('#person'), /Partner of Peggy/); assert.match(await nobody.textContent('#person'), /Married Ted Lawson/);
+  await nobody.click('#person [data-act=openfromperson] >> nth=0'); await nobody.waitForSelector('#story .chip');
+  assert.match(await nobody.textContent('#story .chips'), /Ted Lawson/); await nobody.click('#story [data-act=close]');
+  await nobody.click('[data-v=both]');
+});
 await step('owner signs in with the emailed code and starts a map', async () => {
   await signIn(helen, 'helen@example.com'); await helen.waitForSelector('#newform');
   await helen.click('#nw-other', { force: true }); await helen.fill('#nw-name', 'Peggy Lawson'); await helen.fill('#nw-you', 'Helen'); await helen.fill('#nw-rel', 'Daughter'); await helen.click('#newform button[type=submit]');
@@ -82,6 +93,14 @@ await step('everything is still there after reloading, including the private pho
   const okImg = await helen.locator('#story .photos img').evaluate((i) => i.complete && i.naturalWidth > 0); assert.ok(okImg, 'photo loads from signed link');
   await helen.screenshot({ path: join(shots, 'story.png') }); await helen.click('#story [data-act=close]');
 });
+await step('owner starts the family tree', async () => {
+  await helen.click('[data-v=family]'); await helen.waitForSelector('.famtree .pcard.me'); await helen.click('.famhead [data-act=person]');
+  await helen.click('[data-act=relpanel]'); await helen.waitForSelector('#relform'); await helen.fill('#r-name', 'Arthur Hartley'); await helen.fill('#r-born', 'about 1905');
+  await helen.click('#relform button[type=submit]'); await helen.waitForFunction(() => document.querySelectorAll('.famtree .pcard').length === 2);
+  assert.match(await helen.textContent('#person'), /Parents\s*Arthur Hartley/); await helen.click('#person [data-act=close]');
+  const r = (await mock.db.query(`select kind from family_links`)).rows; assert.deepEqual(r, [{ kind: 'parent' }]);
+  await helen.click('[data-v=both]');
+});
 await step('owner invites a relative', async () => {
   await helen.click('[data-act=settings]'); await helen.waitForSelector('#iv-email'); await helen.fill('#iv-email', 'Tom@Example.com'); await helen.click('#inviteform button[type=submit]');
   await helen.waitForSelector('#invtext'); assert.match(await helen.textContent('#settings'), /tom@example.com/); await helen.click('#settings [data-act=close]');
@@ -97,6 +116,16 @@ await step('the relative signs in, sees the map, cannot edit places, can add a m
   assert.equal(await tom.locator('#story [data-act=delmem]').count(), 1, 'can remove only own memory');
   await tom.click('#story [data-act=close]'); await tom.click('[data-act=settings]'); await tom.waitForSelector('#settings .dlg');
   assert.equal(await tom.locator('#mode-memorial').count(), 0); assert.equal(await tom.locator('[data-act=askdeletemap]').count(), 0);
+});
+await step('the relative adds a partner to the tree and links him to a place', async () => {
+  await tom.click('#settings [data-act=close]'); await tom.click('[data-v=family]'); await tom.waitForSelector('.famtree .pcard.me');
+  await tom.click('.famtree .pcard.me'); await tom.click('[data-act=relpanel]'); await tom.click('#rel-partner', { force: true }); await tom.fill('#r-name', 'Ted Lawson');
+  await tom.click('#relform button[type=submit]'); await tom.waitForFunction(() => document.querySelectorAll('.famtree .pcard').length === 3);
+  await tom.click('#person [data-act=close]'); await tom.click('.pcard[title="Ted Lawson"]'); await tom.waitForSelector('#pp-add');
+  await tom.selectOption('#pp-add', { index: 1 }); await tom.click('[data-act=linkplace]'); await tom.waitForSelector('#person [data-act=openfromperson]');
+  assert.equal((await mock.db.query(`select count(*)::int n from event_people`)).rows[0].n, 1);
+  assert.equal((await mock.db.query(`select count(*)::int n from people`)).rows[0].n, 3);
+  await tom.click('#person [data-act=close]');
 });
 await step('owner sees the relative’s memory, switches to memorial, and it sticks', async () => {
   await helen.goto(web); await helen.waitForSelector('.card'); await helen.click('.card'); await helen.click('.more [data-act=open]');
@@ -122,7 +151,7 @@ await step('removing the invite ends the relative’s access', async () => {
 await step('owner deletes the map and nothing is left behind', async () => {
   await helen.click('[data-act=settings]'); await helen.click('[data-act=askdeletemap]'); await helen.waitForSelector('[data-act=deletemap]'); await helen.click('[data-act=deletemap]');
   await helen.waitForSelector('#newform');
-  for (const t of ['maps', 'events', 'memories', 'photos', 'invites']) assert.equal((await mock.db.query(`select count(*)::int n from ${t}`)).rows[0].n, 0, t);
+  for (const t of ['maps', 'events', 'memories', 'photos', 'invites', 'people', 'family_links', 'event_people']) assert.equal((await mock.db.query(`select count(*)::int n from ${t}`)).rows[0].n, 0, t);
   assert.equal(mock.files.size, 0, 'photo files removed');
 });
 await step('sign out returns to the sign-in screen', async () => { await helen.click('[data-act=signout]'); await helen.waitForSelector('#si-email'); });

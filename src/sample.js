@@ -4,7 +4,7 @@ function samplePhoto(label,h){
   var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl('+h+',35%,82%)"/><stop offset="1" stop-color="hsl('+h+',30%,62%)"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><circle cx="310" cy="80" r="34" fill="hsl('+h+',45%,92%)"/><path d="M0 230 Q100 170 200 215 T400 190 V300 H0z" fill="hsl('+h+',28%,45%)"/><path d="M0 260 Q140 215 260 250 T400 240 V300 H0z" fill="hsl('+h+',30%,34%)"/><rect x="12" y="12" width="376" height="276" fill="none" stroke="#fff" stroke-width="6" opacity=".7"/><text x="200" y="60" text-anchor="middle" font-family="Georgia,serif" font-size="22" fill="#fff">'+esc(label)+'</text><text x="200" y="285" text-anchor="middle" font-family="Verdana,sans-serif" font-size="13" fill="#fff" opacity=".9">Sample picture</text></svg>';
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-export function sample(){
+function base(){
   var n=0;function E(cat,title,when,lat,lng,addr,mem,o){o=o||{};var e={id:'s'+(++n),cat:cat,title:title,when:when,lat:lat,lng:lng,precision:o.rough?'approx':'detailed',addr:addr,extra:o.extra||{},people:o.people||'',memories:mem||[],photos:(o.photos||[]).map(function(p){return {src:samplePhoto(p[0],p[1]),cap:p[0]}})};return e}
   var P='Peggy',H='Helen (daughter)',T='Tom (grandson)';
   return {
@@ -36,3 +36,26 @@ export function sample(){
    ]};
 }
 
+
+// Peggy's family, and the places each of them was part of.
+export function sample(){
+  var o=base(), id=0, P=function(name,born,died,note){var p={id:'p'+(++id),subject:false,name:name,born:born||'',died:died||'',note:note||''};o.people.push(p);return p.id};
+  o.people=[{id:'p0',subject:true,name:'',born:'',died:'',note:''}];
+  var arthur=P('Arthur Hartley','about 1905','1971','A boilermaker at the Phoenix Foundry. Sang in the kitchen.'),
+      rose=P('Rose Hartley','1908','1990','Kept chooks and four daughters in line.'),
+      joan=P('Joan Hartley','1941','','Peggy’s little sister. Still rings every Sunday.'),
+      ted=P('Ted Lawson','1935','2019','Came out from Whitby in 1957 and never quite lost the accent.'),
+      edith=P('Edith Lawson','1910','1996','Ted’s mother. She and Peggy wrote to each other for twenty years.'),
+      helen=P('Helen Lawson','1965','',''),mark=P('Mark Rossi','1963','',''),tom=P('Tom Rossi','1994','','');
+  var n=0,L=function(f,t,k){o.links.push({id:'f'+(++n),from:f,to:t,kind:k})};
+  o.links=[];
+  L('p0',ted,'partner');L(arthur,rose,'partner');L(arthur,'p0','parent');L(rose,'p0','parent');L(arthur,joan,'parent');L(rose,joan,'parent');
+  L(edith,ted,'parent');L('p0',helen,'parent');L(ted,helen,'parent');L(helen,mark,'partner');L(helen,tom,'parent');L(mark,tom,'parent');
+  var at=function(title,ids){var e=o.events.find(function(x){return x.title===title});if(e)e.who=ids};
+  o.events.forEach(function(e){e.who=[]});
+  at('Born at the Base Hospital',[rose]);at('The weatherboard on Humffray Street',[arthur,rose,joan]);at('Married Ted Lawson',[ted,arthur,rose,joan]);
+  at('Electra Street, Williamstown',[ted,helen]);at('Helen was born',[helen,ted]);at('Summers at Lorne',[ted,helen]);
+  at('Trip to Whitby to meet Ted’s family',[ted,edith]);at('The house in Daylesford',[ted,tom]);at('Uluru, after retiring',[ted]);
+  at('The unit near Helen, Geelong',[helen,mark,tom]);at('Eastern Beach',[tom]);at('Resting place, beside Ted',[ted]);
+  return o;
+}

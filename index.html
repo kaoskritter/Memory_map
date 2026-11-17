@@ -24,6 +24,7 @@
       <button class="tab" data-act="view" data-v="map">Map</button>
       <button class="tab" data-act="view" data-v="timeline">Timeline</button>
       <button class="tab" data-act="view" data-v="photos">Photos</button>
+      <button class="tab" data-act="view" data-v="family">Family</button>
     </div>
     <span class="spacer"></span>
     <button class="btn quiet filtertoggle" data-act="filters" aria-expanded="false">Choose what to show</button>
@@ -34,12 +35,14 @@
       <section class="pane mapp" aria-label="Map"><div id="map"></div><div class="preview" id="preview" aria-live="polite"></div></section>
       <section class="pane tl" aria-label="Timeline"><div class="tlscroll" id="tl" tabindex="-1"></div></section>
       <section class="pane gal" aria-label="Photos"><div class="galgrid" id="gal"></div></section>
+      <section class="pane fam" aria-label="Family tree"><div class="famhead" id="famhead"></div><div class="famscroll" id="fam"></div></section>
     </div>
   </main>
   <div class="edit" id="edit"></div>
 </div>
 <div class="book" id="book"></div>
 <dialog id="story" aria-label="Story"></dialog>
+<dialog id="person" aria-label="Person"></dialog>
 <dialog id="settings" aria-label="Settings"></dialog>
 <dialog id="privacy" aria-label="How we look after your stories"></dialog>
 <div class="toast" id="toast" role="status" hidden></div>

@@ -24,6 +24,13 @@ export function demoStore() {
     async addInvite() { throw new Error('demo'); },
     async removeInvite() {},
     async deleteMap() {},
+    async addPerson(p) { return { id: uuid(), subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '' }; },
+    async updatePerson() {},
+    async deletePerson() {},
+    async addLinks(list) { return list.map((l) => ({ id: uuid(), ...l })); },
+    async removeLink() {},
+    async linkEvent() {},
+    async unlinkEvent() {},
   };
 }
 
@@ -43,24 +50,30 @@ export async function createMap(userId, subject) {
 }
 
 export async function loadMap(mapId, userId) {
-  const [m, ev, mem, ph] = await Promise.all([
+  const [m, ev, mem, ph, pp, fl, ep] = await Promise.all([
     sb.from('maps').select('*').eq('id', mapId).single(),
     sb.from('events').select('*').eq('map_id', mapId),
     sb.from('memories').select('*').eq('map_id', mapId).order('created_at'),
     sb.from('photos').select('*').eq('map_id', mapId).order('created_at'),
+    sb.from('people').select('*').eq('map_id', mapId).order('created_at'),
+    sb.from('family_links').select('*').eq('map_id', mapId),
+    sb.from('event_people').select('*').eq('map_id', mapId).order('created_at'),
   ]);
-  const map = ok(m), events = ok(ev), memories = ok(mem), photos = ok(ph);
+  const map = ok(m), events = ok(ev), memories = ok(mem), photos = ok(ph), people = ok(pp), links = ok(fl), eventPeople = ok(ep);
   let urls = {};
   if (photos.length) {
     const signed = ok(await sb.storage.from('photos').createSignedUrls(photos.map((p) => p.path), 60 * 60 * 6));
     signed.forEach((s) => { if (s.signedUrl) urls[s.path] = s.signedUrl; });
   }
   const byEvent = (rows) => rows.reduce((acc, r) => ((acc[r.event_id] = acc[r.event_id] || []).push(r), acc), {});
-  const mems = byEvent(memories), phs = byEvent(photos);
+  const mems = byEvent(memories), phs = byEvent(photos), who = byEvent(eventPeople);
   return {
     demo: false, mapId, role: map.owner_id === userId ? 'owner' : 'contributor', mode: map.mode, subject: rowToSubject(map),
+    people: people.map((r) => ({ id: r.id, subject: r.is_subject, name: r.name, born: r.born, died: r.died, note: r.note })),
+    links: links.map((r) => ({ id: r.id, from: r.from_id, to: r.to_id, kind: r.kind })),
     events: events.map((r) => ({
       id: r.id, cat: r.category, title: r.title, precision: r.precision, addr: r.addr || {}, lat: r.lat, lng: r.lng, when: r.when_text, extra: r.extra || {}, people: r.people,
+      who: (who[r.id] || []).map((x) => x.person_id),
       memories: (mems[r.id] || []).map((x) => ({ id: x.id, by: x.author_name, text: x.body, mine: x.author_id === userId })),
       photos: (phs[r.id] || []).filter((x) => urls[x.path]).map((x) => ({ id: x.id, path: x.path, src: urls[x.path], cap: x.caption, mine: x.uploaded_by === userId })),
     })),
@@ -104,6 +117,19 @@ export function cloudStore(mapId, userId) {
     async listInvites() { return ok(await sb.from('invites').select('id, email, accepted_at').eq('map_id', mapId).order('created_at')); },
     async addInvite(email) { return ok(await sb.from('invites').insert({ map_id: mapId, email: email.toLowerCase(), invited_by: userId }).select('id, email, accepted_at').single()); },
     async removeInvite(id) { ok(await sb.from('invites').delete().eq('id', id)); },
+    async addPerson(p) {
+      const r = ok(await sb.from('people').insert({ map_id: mapId, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', created_by: userId }).select('id').single());
+      return { id: r.id, subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '' };
+    },
+    async updatePerson(p) { ok(await sb.from('people').update({ name: p.subject ? '' : p.name, born: p.born || '', died: p.died || '', note: p.note || '' }).eq('id', p.id)); },
+    async deletePerson(p) { ok(await sb.from('people').delete().eq('id', p.id)); },
+    async addLinks(list) {
+      const rows = ok(await sb.from('family_links').insert(list.map((l) => ({ map_id: mapId, from_id: l.from, to_id: l.to, kind: l.kind, created_by: userId }))).select('id, from_id, to_id, kind'));
+      return rows.map((r) => ({ id: r.id, from: r.from_id, to: r.to_id, kind: r.kind }));
+    },
+    async removeLink(l) { ok(await sb.from('family_links').delete().eq('id', l.id)); },
+    async linkEvent(e, personId) { ok(await sb.from('event_people').insert({ map_id: mapId, event_id: e.id, person_id: personId, added_by: userId })); },
+    async unlinkEvent(e, personId) { ok(await sb.from('event_people').delete().eq('event_id', e.id).eq('person_id', personId)); },
     async deleteMap(S) {
       const paths = S.events.flatMap((e) => e.photos.map((p) => p.path)).filter(Boolean);
       for (let i = 0; i < paths.length; i += 100) await sb.storage.from('photos').remove(paths.slice(i, i + 100));

@@ -7,13 +7,13 @@ Memory Map maps a person's life story across places and time: life events pinned
 - Built for older, less technical users: large text, high contrast, big touch targets, plain language, tablet-friendly. Simplicity beats features.
 - Tone is warm and respectful; the product deals with memory, ageing and grief, especially in memorial mode.
 - Rough answers are valid, never errors: "Only roughly" addresses and dates like "early 1960s".
-- One owner per map; invited contributors add memories and photos only. This is enforced in the database, not just the interface.
+- One owner per map; invited contributors add memories and photos only, plus people and connections in the family tree (decided 17 Nov 2026). This is enforced in the database, not just the interface.
 - Private-only. Do not add public or community features without an explicit decision.
 
 ## How it is put together
 
 - Static Vite app in plain JavaScript with Leaflet. No server of our own.
-- `src/main.js` is the interface; `src/store.js` holds every Supabase call; `src/when.js` reads rough dates.
+- `src/main.js` is the interface; `src/store.js` holds every Supabase call; `src/when.js` reads rough dates; `src/family.js` lays out the family tree and names relationships.
 - Supabase (Sydney) provides sign-in, Postgres with row level security, and a private photo bucket. Schema and rules live in `supabase/migrations/`.
 - Hosted on Vercel; every push to `main` deploys to production.
 

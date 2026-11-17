@@ -8,6 +8,7 @@ import './styles.css';
 import { CATS, CAT } from './categories.js';
 import { parseWhen } from './when.js';
 import { sample } from './sample.js';
+import { relations, layout, relationLabel, linksFor, sameLink } from './family.js';
 import { sb, demoStore, cloudStore, listMaps, acceptInvites, createMap, loadMap } from './store.js';
 
 const $ = (s, r) => (r || document).querySelector(s);
@@ -16,7 +17,7 @@ const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)
 const TILE_URL = import.meta.env.VITE_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTR = import.meta.env.VITE_TILE_ATTRIBUTION || '© OpenStreetMap contributors';
 const GEOCODE_URL = import.meta.env.VITE_GEOCODE_URL || 'https://nominatim.openstreetmap.org/search';
-const VIEWS = ['map', 'timeline', 'both', 'photos', 'edit'];
+const VIEWS = ['map', 'timeline', 'both', 'photos', 'family', 'edit'];
 const badge = (cat) => { const c = CAT[cat]; return `<span class="badge" style="--c:${c.c}" aria-hidden="true"><svg viewBox="0 0 24 24">${c.i}</svg></span>`; };
 
 /* ---------- preferences kept on this device only ---------- */
@@ -225,6 +226,7 @@ function openStory(id, keepText) {
   const canRemove = (it) => owner() || it.mine;
   $('#story').innerHTML = `<div class="dlg"><header>${badge(e.cat)}<div><h2>${esc(e.title)}</h2><p class="meta">${esc(whenLabel(e))} · ${esc(placeLabel(e))}${e.precision === 'approx' ? '<span class="rough">roughly</span>' : ''}</p>${
     facts ? `<p class="meta">${esc(facts)}</p>` : ''}${e.people ? `<p class="meta">With ${esc(e.people)}</p>` : ''}${then && then !== s.preferred ? `<p class="meta">Known then as ${esc(then)}</p>` : ''}</div><button class="btn quiet" data-act="close">Close</button></header>
+    ${whoSection(e)}
     <section><h3>Memories</h3>${e.memories.length ? e.memories.map((m, i) => `<blockquote class="memory"><p>${esc(m.text)}</p><footer>${esc(m.by)}${canRemove(m) ? ` <button class="link" data-act="delmem" data-i="${i}">Remove</button>` : ''}</footer></blockquote>`).join('') : '<p class="meta">Nobody has written a memory here yet. Yours could be the first.</p>'}</section>
     ${e.photos.length ? `<section><h3>Photos</h3><div class="photos">${e.photos.map((p, i) => `<figure><img src="${esc(p.src)}" alt="${esc(p.cap || 'Photo from ' + e.title)}">${canRemove(p) ? `<button class="link" data-act="delstoryphoto" data-i="${i}">Remove</button>` : ''}</figure>`).join('')}</div></section>` : ''}
     <form id="memform" class="field" style="gap:.6rem"><h3>Add a memory</h3><div class="field"><label for="m-text">What do you remember about this place?</label><textarea id="m-text" maxlength="5000" placeholder="A sentence or two is plenty.">${esc(keepText || '')}</textarea></div>
@@ -392,11 +394,14 @@ function showBook() {
   const names = [s.birthName && s.birthName !== s.preferred ? 'Born ' + s.birthName : '', ...(s.changes || []).map((c) => [c.name, c.year && 'from ' + c.year].filter(Boolean).join(', '))].filter(Boolean);
   let h = `<div class="bookbar"><p><b>This is how the memory book will print.</b> Choose “Save as PDF” in the print window to keep or email a copy.</p><div class="rowbtns"><button class="btn primary" data-act="printbook">Print or save</button><button class="btn" data-act="closebook">Back to the map</button></div></div>
    <article class="pages"><header class="cover"><p class="brand">Memory Map</p><h1>${memorial() ? 'In loving memory of ' + esc(name) : 'The story of ' + esc(name)}</h1>${life ? `<p class="life">${esc(life)}</p>` : ''}${names.length ? `<p class="meta">${esc(names.join(' · '))}</p>` : ''}<p class="meta">${ev.length} ${ev.length === 1 ? 'place' : 'places'}, told by the people who were there.</p></header>`;
+  const R = famRel(), kin = S.people.filter((p) => !p.subject);
+  if (kin.length) h += `<section class="bk-family"><h2 class="bk-decade">Family</h2><ul>${kin.map((p) => { const rl = relationLabel(p.id, S.people, R); return `<li><b>${esc(p.name)}</b>${rl && rl !== 'Family' ? ' · ' + esc(rl) : ''}${yearsOf(p) ? ' · ' + esc(yearsOf(p)) : ''}</li>`; }).join('')}</ul></section>`;
   let cur = null;
   ev.forEach((e) => {
     const r = range(e), g = r ? Math.floor(r.from / 10) * 10 + 's' : 'Not sure when', facts = factsOf(e), where = placeLabel(e);
+    const withWho = [...whoNames(e), e.people].filter(Boolean).join(', ');
     if (g !== cur) { h += `<h2 class="bk-decade">${g}</h2>`; cur = g; }
-    h += `<section class="bk-place"><h3>${esc(e.title)}</h3><p class="meta">${esc([CAT[e.cat].name, whenLabel(e), where && (e.precision === 'approx' ? 'around ' : '') + where].filter(Boolean).join(' · '))}</p>${facts ? `<p class="meta">${esc(facts)}</p>` : ''}${e.people ? `<p class="meta">With ${esc(e.people)}</p>` : ''}${
+    h += `<section class="bk-place"><h3>${esc(e.title)}</h3><p class="meta">${esc([CAT[e.cat].name, whenLabel(e), where && (e.precision === 'approx' ? 'around ' : '') + where].filter(Boolean).join(' · '))}</p>${facts ? `<p class="meta">${esc(facts)}</p>` : ''}${withWho ? `<p class="meta">With ${esc(withWho)}</p>` : ''}${
       e.memories.map((m) => `<blockquote class="memory"><p>${esc(m.text)}</p><footer>${esc(m.by)}</footer></blockquote>`).join('')}${
       e.photos.length ? `<div class="bk-photos">${e.photos.map((p) => `<img src="${esc(p.src)}" alt="${esc(p.cap || 'Photo from ' + e.title)}">`).join('')}</div>` : ''}</section>`;
   });
@@ -414,15 +419,135 @@ function exportCopy() {
 }
 
 /* =====================================================================
+   Family tree
+   ===================================================================== */
+const U = { slot: 12.6, rowh: 9.8, cw: 11, ch: 6.6, padx: 1.4, pady: 2 };   // rem
+let personSel = null, personPanel = 'view';
+const famRel = () => relations(S.people, S.links);
+const personById = (id) => S.people.find((p) => p.id === id);
+const pname = (p) => (p.subject ? (S.subject.preferred || 'Them') : p.name);
+function yearsOf(p) {
+  const born = p.subject ? S.subject.born : p.born, died = p.subject ? (memorial() ? S.subject.died : '') : p.died;
+  if (born && died) return born + ' – ' + died; if (born) return 'Born ' + born; if (died) return 'Died ' + died; return '';
+}
+const whoNames = (e) => (e.who || []).map(personById).filter(Boolean).map(pname);
+const genName = (g) => ({ '-3': 'Great-grandparents’ generation', '-2': 'Grandparents’ generation', '-1': 'Parents’ generation', 0: first(S.subject.preferred) + '’s generation', 1: 'Children’s generation', 2: 'Grandchildren’s generation', 3: 'Great-grandchildren’s generation' }[g] || 'Further generation');
+
+function renderFamily() {
+  const box = $('#fam'); if (!box || !S) return;
+  if (!S.people || !S.people.some((p) => p.subject)) { box.innerHTML = '<p class="empty">The family tree is not ready on this Memory Map yet. Please try again shortly.</p>'; $('#famhead').innerHTML = ''; return; }
+  const t = layout(S.people, S.links), R = t.R, inTree = (id) => t.pos[id] !== undefined;
+  const xs = Object.values(t.pos).map((p) => p.x), minX = Math.min(...xs), maxX = Math.max(...xs);
+  const W = (maxX - minX) * U.slot + U.cw + U.padx * 2, H = (t.rows.length - 1) * U.rowh + U.ch + U.pady * 2;
+  const Lf = (id) => U.padx + (t.pos[id].x - minX) * U.slot, Tf = (id) => U.pady + t.pos[id].row * U.rowh, cx = (id) => Lf(id) + U.cw / 2;
+  let lines = '';
+  const seen = new Set();
+  S.people.filter((p) => inTree(p.id)).forEach((p) => {
+    R[p.id].partners.forEach((q) => {
+      const k = [p.id, q].sort().join(); if (seen.has(k) || !inTree(q) || t.pos[q].row !== t.pos[p.id].row) return; seen.add(k);
+      const [a, b] = t.pos[p.id].x < t.pos[q].x ? [p.id, q] : [q, p.id], y = Tf(a) + U.ch / 2;
+      lines += `<path class="partner" d="M${Lf(a) + U.cw} ${y}H${Lf(b)}"/>`;
+    });
+    const ps = [...R[p.id].parents].filter((x) => inTree(x) && t.pos[x].row < t.pos[p.id].row);
+    if (ps.length) {
+      const pair = ps.length >= 2 && R[ps[0]].partners.has(ps[1]) && t.pos[ps[0]].row === t.pos[ps[1]].row;
+      const ax = pair ? (cx(ps[0]) + cx(ps[1])) / 2 : cx(ps[0]), ay = pair ? Tf(ps[0]) + U.ch / 2 : Tf(ps[0]) + U.ch;
+      const mid = Tf(p.id) - (U.rowh - U.ch) / 2;
+      lines += `<path d="M${ax} ${ay}V${mid}H${cx(p.id)}V${Tf(p.id)}"/>`;
+    }
+  });
+  S.links.filter((l) => l.kind === 'sibling' && inTree(l.from) && inTree(l.to) && t.pos[l.from].row === t.pos[l.to].row).forEach((l) => {
+    const y = Tf(l.from) - 0.9; lines += `<path d="M${cx(l.from)} ${Tf(l.from)}V${y}H${cx(l.to)}V${Tf(l.to)}"/>`;
+  });
+  const card = (p, style) => { const rl = relationLabel(p.id, S.people, R), yr = yearsOf(p), on = p.id === personSel;
+    return `<button class="pcard${p.subject ? ' me' : ''}${on ? ' sel' : ''}" ${style || ''} data-act="person" data-id="${p.id}" title="${esc(pname(p))}" aria-label="${esc([pname(p), p.subject ? 'the person this Memory Map is about' : rl, yr].filter(Boolean).join(', '))}"><span class="nm">${esc(pname(p))}</span>${yr ? `<span class="yr">${esc(yr)}</span>` : ''}<span class="rl">${p.subject ? 'This Memory Map' : esc(rl)}</span></button>`; };
+  let html = `<div class="famtree" style="width:${W}rem;height:${H}rem"><svg viewBox="0 0 ${W} ${H}" width="${W}rem" height="${H}rem" aria-hidden="true">${lines}</svg>`;
+  t.rows.forEach((row) => { html += `<h3 class="sr">${esc(genName(t.gen[row[0]]))}</h3>`; row.forEach((id) => { html += card(personById(id), `style="left:${Lf(id)}rem;top:${Tf(id)}rem"`); }); });
+  html += '</div>';
+  if (t.loose.length) html += `<div class="famloose"><h3>Not joined to the tree yet</h3><p class="meta">Open someone and use “Add a relative” to join them up.</p><div class="looserow">${t.loose.map((id) => card(personById(id))).join('')}</div></div>`;
+  box.innerHTML = html;
+  const n = S.people.length - 1;
+  $('#famhead').innerHTML = `<p>${n ? `Tap anyone to see their places, add a relative, or fix a mistake. ${n} ${n === 1 ? 'person' : 'people'} so far.` : `Start with ${esc(first(S.subject.preferred))}: tap their name, then “Add a relative”.`}</p><div class="rowbtns"><button class="btn primary" data-act="person" data-id="${S.people.find((p) => p.subject).id}">Add a relative</button><button class="btn quiet" data-act="famcentre">Back to the middle</button></div>`;
+}
+function centreFamily() {
+  const sc = $('#fam'), me = sc && sc.querySelector('.pcard.me'); if (!me) return;
+  sc.scrollLeft = me.offsetLeft - sc.clientWidth / 2 + me.offsetWidth / 2; sc.scrollTop = Math.max(0, me.offsetTop - sc.clientHeight / 2 + me.offsetHeight / 2);
+}
+function whoSection(e) {
+  if (!S.people) return '';
+  const who = (e.who || []).map(personById).filter(Boolean), others = S.people.filter((p) => !(e.who || []).includes(p.id));
+  return `<section><h3>People in this story</h3>${who.length ? `<div class="chips">${who.map((p) => `<span class="chip"><button class="link" data-act="person" data-id="${p.id}">${esc(pname(p))}</button><button class="chipx" data-act="unwho" data-id="${p.id}" aria-label="Take ${esc(pname(p))} out of this story">×</button></span>`).join('')}</div>` : '<p class="meta">Nobody from the family tree is linked to this place yet.</p>'}${
+    others.length ? `<div class="addrow"><div class="field"><label for="w-add">Add someone from the family tree</label><select id="w-add"><option value="">Choose a person…</option>${others.map((p) => `<option value="${p.id}">${esc(pname(p))}</option>`).join('')}</select></div><button class="btn" data-act="addwho" data-id="${e.id}">Add to this story</button></div>` : ''}</section>`;
+}
+
+function openPerson(id, panel) {
+  const p = personById(id); if (!p) return;
+  personSel = id; personPanel = panel || 'view'; renderFamily();
+  const R = famRel(), r = R[id], rl = relationLabel(id, S.people, R), yr = yearsOf(p);
+  const names = (set) => [...set].map(personById).filter(Boolean).map((q) => `<button class="link" data-act="person" data-id="${q.id}">${esc(pname(q))}</button>`).join(', ');
+  const places = S.events.filter((e) => allowed(e) && (e.who || []).includes(id)).sort((a, b) => sortKey(a) - sortKey(b));
+  const notYet = S.events.filter((e) => allowed(e) && !(e.who || []).includes(id)).sort((a, b) => sortKey(a) - sortKey(b));
+  let h = `<div class="dlg"><header><div><h2>${esc(pname(p))}</h2><p class="meta">${esc([p.subject ? 'The person this Memory Map is about' : (rl !== 'Family' ? rl + ' of ' + first(S.subject.preferred) : ''), yr].filter(Boolean).join(' · '))}</p></div><button class="btn quiet" data-act="close">Close</button></header>`;
+  if (personPanel === 'view') {
+    if (p.note) h += `<blockquote class="memory"><p>${esc(p.note)}</p></blockquote>`;
+    const fam = [['Parents', r.parents], ['Partners', r.partners], ['Brothers and sisters', r.siblings], ['Children', r.children]].filter(([, s]) => s.size);
+    h += `<section><h3>Family</h3>${fam.length ? `<dl class="kin">${fam.map(([k, s]) => `<dt>${k}</dt><dd>${names(s)}</dd>`).join('')}</dl>` : '<p class="meta">Not joined to anyone yet.</p>'}</section>`;
+    h += `<section><h3>Places in their story</h3>${places.length ? `<ul class="plain placelist">${places.map((e) => `<li><button class="link" data-act="openfromperson" data-id="${e.id}">${esc(e.title)}</button> <span class="meta">${esc(whenLabel(e))}</span></li>`).join('')}</ul>` : '<p class="meta">Not linked to any places yet.</p>'}${
+      notYet.length ? `<div class="addrow"><div class="field"><label for="pp-add">Link a place to ${esc(first(pname(p)))}</label><select id="pp-add"><option value="">Choose a place…</option>${notYet.map((e) => `<option value="${e.id}">${esc(e.title)} (${esc(whenLabel(e))})</option>`).join('')}</select></div><button class="btn" data-act="linkplace" data-id="${id}">Link this place</button></div>` : ''}</section>`;
+    h += `<div class="rowbtns"><button class="btn primary" data-act="relpanel" data-id="${id}">Add a relative</button><button class="btn" data-act="editperson" data-id="${id}">Change details</button></div>`;
+  } else if (personPanel === 'add') {
+    const others = S.people.filter((q) => q.id !== id), partners = [...r.partners].map(personById).filter(Boolean);
+    h += `<form id="relform" class="field" style="gap:.9rem"><input type="hidden" id="r-target" value="${id}">
+      <fieldset><legend>Who are you adding to ${esc(first(pname(p)))}’s family?</legend><div class="relgrid">${[['parent', 'A parent'], ['partner', 'A partner or spouse'], ['child', 'A child'], ['sibling', 'A brother or sister']].map(([v, l], i) => `<label class="choice"><input type="radio" name="rel" id="rel-${v}" value="${v}"${i === 0 ? ' checked' : ''}>${l}</label>`).join('')}</div></fieldset>
+      ${partners.length ? `<div class="field" id="r-otherbox"><label for="r-other">For a child: who is the other parent?</label><select id="r-other"><option value="">Not sure, or nobody in the tree</option>${partners.map((q, i) => `<option value="${q.id}"${i === 0 ? ' selected' : ''}>${esc(pname(q))}</option>`).join('')}</select></div>` : ''}
+      ${others.length ? `<fieldset><legend>Are they already in the family tree?</legend><label class="choice"><input type="radio" name="rwho" id="rwho-new" value="new" checked>No, add a new person</label><label class="choice"><input type="radio" name="rwho" id="rwho-old" value="old">Yes, choose them</label></fieldset>` : ''}
+      <div id="r-newbox" class="field" style="gap:.9rem">${fld('r-name', 'Their name', '', 'The name the family knew them by')}<div class="two">${fld('r-born', 'Year born', '', 'Optional. A rough year is fine.', 60)}${fld('r-died', 'Year they passed away', '', 'Optional', 60)}</div></div>
+      ${others.length ? `<div id="r-oldbox" class="field" hidden><label for="r-old">Who is it?</label><select id="r-old"><option value="">Choose a person…</option>${others.map((q) => `<option value="${q.id}">${esc(pname(q))}</option>`).join('')}</select></div>` : ''}
+      <div class="rowbtns"><button class="btn primary" type="submit">Add to the family</button><button class="btn" type="button" data-act="person" data-id="${id}">Cancel</button></div></form>`;
+  } else {
+    const links = S.links.filter((l) => l.from === id || l.to === id);
+    const describe = (l) => { const o = personById(l.from === id ? l.to : l.from); const nm = o ? pname(o) : 'someone'; if (l.kind === 'partner') return 'Partner of ' + nm; if (l.kind === 'sibling') return 'Brother or sister of ' + nm; return l.from === id ? 'Parent of ' + nm : 'Child of ' + nm; };
+    h += `<form id="personform" class="field" style="gap:.9rem"><input type="hidden" id="pe-id" value="${id}">${p.subject ? `<p class="notice">${owner() ? 'Their name and dates are changed under “Add or change places”, then “About”.' : 'Their name and dates are looked after by the person who manages this Memory Map.'}</p>` : `${fld('pe-name', 'Their name', p.name)}<div class="two">${fld('pe-born', 'Year born', p.born, 'A rough year is fine', 60)}${fld('pe-died', 'Year they passed away', p.died, 'Optional', 60)}</div>`}
+      <div class="field"><label for="pe-note">A few words about them</label><span class="hint">Optional. What were they like?</span><textarea id="pe-note" maxlength="1000">${esc(p.note)}</textarea></div>
+      <div class="rowbtns"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="person" data-id="${id}">Cancel</button></div></form>
+      ${links.length ? `<fieldset><legend>Connections</legend><p class="hint">If one of these is wrong, remove it and add it again the right way.</p>${links.map((l) => `<div class="entry"><div class="t"><b>${esc(describe(l))}</b></div><button class="btn quiet" data-act="dellink" data-id="${l.id}">Remove</button></div>`).join('')}</fieldset>` : ''}
+      ${p.subject ? '' : personPanel === 'confirm' ? `<div class="confirm"><p><b>Remove ${esc(pname(p))} from the family tree?</b> Their connections and place links go too. Places and memories stay.</p><button class="btn danger" data-act="delperson" data-id="${id}">Yes, remove them</button><button class="btn" data-act="editperson" data-id="${id}">Keep them</button></div>` : `<p><button class="link danger" data-act="askdelperson" data-id="${id}">Remove ${esc(pname(p))} from the family tree…</button></p>`}`;
+  }
+  $('#person').innerHTML = h + '</div>';
+  const d = $('#person'); if (!d.open) d.showModal();
+  const f = d.querySelector(personPanel === 'add' ? '#rel-parent' : personPanel === 'edit' ? '#pe-name, #pe-note' : 'h2'); if (f && personPanel !== 'view') f.focus();
+}
+async function addRelative() {
+  const target = $('#r-target').value, rel = document.querySelector('input[name=rel]:checked').value, old = $('#rwho-old') && $('#rwho-old').checked;
+  let pid;
+  if (old) { pid = $('#r-old').value; if (!pid) { $('#r-old').focus(); toast('Choose who it is first.'); return; } }
+  else {
+    const name = $('#r-name').value.trim(); if (!name) { $('#r-name').focus(); toast('Type their name first.'); return; }
+    const p = await store.addPerson({ name, born: $('#r-born').value.trim(), died: $('#r-died').value.trim() }); S.people.push(p); pid = p.id;
+  }
+  const other = rel === 'child' && $('#r-other') ? $('#r-other').value : '';
+  const want = linksFor(rel, pid, target, famRel(), other).filter((l) => !S.links.some((x) => sameLink(x, l)));
+  if (want.length) S.links.push(...(await store.addLinks(want)));
+  renderFamily(); openPerson(target); toast(pname(personById(pid)) + ' has been added to the family.');
+}
+async function savePerson() {
+  const p = personById($('#pe-id').value); const v = (i) => { const el = $('#' + i); return el ? el.value.trim() : undefined; };
+  const next = { ...p, note: v('pe-note') || '' };
+  if (!p.subject) { next.name = v('pe-name'); next.born = v('pe-born') || ''; next.died = v('pe-died') || ''; if (!next.name) { $('#pe-name').focus(); toast('Their name cannot be empty.'); return; } }
+  await store.updatePerson(next); Object.assign(p, next); renderFamily(); openPerson(p.id); toast('Saved.');
+}
+
+/* =====================================================================
    Wiring
    ===================================================================== */
-function refresh() { renderTop(); renderFilters(); renderMap(); renderTimeline(); renderPreview(); renderGallery(); }
+function refresh() { renderTop(); renderFilters(); renderMap(); renderTimeline(); renderPreview(); renderGallery(); renderFamily(); }
 function setView(v) {
   if (v === 'edit' && !owner()) v = 'both';
   S.view = v; if (v !== 'edit') { prefs.view = v; savePrefs(); }
   renderTop();
   if (v === 'edit') { renderEdit(); $('#edit').scrollTop = 0; } else { editing = null; draft = null; }
   if (map && v !== 'edit') setTimeout(() => { map.invalidateSize(); if (!fitted) { fitHome(); fitted = true; } }, 30);
+  if (v === 'family') { renderFamily(); setTimeout(centreFamily, 0); }
   try { if (location.hash.slice(1) !== v) history.replaceState(null, '', '#' + v); } catch (e) { /* ignore */ }
 }
 function saveAbout(a, b) {
@@ -472,12 +597,24 @@ document.addEventListener('click', (ev) => {
     delmem: () => run(async () => { const e = byId(sel), m = e.memories[+b.dataset.i]; await store.removeMemory(m); e.memories.splice(+b.dataset.i, 1); openStory(sel, $('#m-text').value); }),
     delstoryphoto: () => run(async () => { const e = byId(sel), p = e.photos[+b.dataset.i]; await store.removePhoto(p); e.photos.splice(+b.dataset.i, 1); renderGallery(); openStory(sel, $('#m-text').value); }),
     geocode: () => geocode(),
+    person: () => { document.querySelectorAll('#story[open]').forEach((d) => d.close()); openPerson(id); },
+    relpanel: () => openPerson(id, 'add'),
+    editperson: () => openPerson(id, 'edit'),
+    askdelperson: () => openPerson(id, 'confirm'),
+    delperson: () => run(async () => { const p = personById(id); await store.deletePerson(p); S.people = S.people.filter((x) => x.id !== id); S.links = S.links.filter((l) => l.from !== id && l.to !== id); S.events.forEach((e) => { e.who = (e.who || []).filter((x) => x !== id); }); personSel = null; $('#person').close(); renderFamily(); toast(pname(p) + ' has been removed from the family tree.'); }),
+    dellink: () => run(async () => { const l = S.links.find((x) => x.id === id); await store.removeLink(l); S.links = S.links.filter((x) => x.id !== id); openPerson(personSel, 'edit'); }),
+    famcentre: () => centreFamily(),
+    openfromperson: () => { $('#person').close(); openStory(id); },
+    linkplace: () => run(async () => { const eid = $('#pp-add').value; if (!eid) { $('#pp-add').focus(); toast('Choose a place first.'); return; } const e = byId(eid); await store.linkEvent(e, id); e.who = [...(e.who || []), id]; openPerson(id); toast('Linked.'); }),
+    addwho: () => run(async () => { const pid = $('#w-add').value; if (!pid) { $('#w-add').focus(); toast('Choose a person first.'); return; } const e = byId(id); await store.linkEvent(e, pid); e.who = [...(e.who || []), pid]; openStory(e.id, $('#m-text').value); }),
+    unwho: () => run(async () => { const e = byId(sel); await store.unlinkEvent(e, id); e.who = (e.who || []).filter((x) => x !== id); openStory(e.id, $('#m-text').value); }),
     saveabout: () => run(() => saveAbout(a, b)), addname: () => run(() => saveAbout(a, b)), delname: () => run(() => saveAbout(a, b)),
   };
   if (acts[a]) acts[a]();
 });
 document.addEventListener('change', (ev) => {
   const t = ev.target;
+  if (t.name === 'rwho') { $('#r-newbox').hidden = t.value === 'old'; $('#r-oldbox').hidden = t.value !== 'old'; (t.value === 'old' ? $('#r-old') : $('#r-name')).focus(); return; }
   if (t.id === 'f-path') { prefs.path = t.checked; savePrefs(); renderMap(); }
   else if (t.dataset.f) { prefs.filters[t.dataset.f] = t.checked; savePrefs(); if (sel && !visible().some((e) => e.id === sel)) sel = null; renderMap(); renderTimeline(); renderPreview(); renderGallery(); }
   else if (t.name === 'prec') { readForm(); draft.precision = t.value; renderEdit(); $('#p-' + (t.value === 'approx' ? 'a' : 'd')).focus(); }
@@ -523,6 +660,8 @@ document.addEventListener('submit', (ev) => {
     if (by) { prefs.myName = by; savePrefs(); }
     const e = byId(sel); e.memories.push(await store.addMemory(e, by || 'A family member', tx)); renderTimeline(); openStory(sel); toast('Memory saved. Thank you.');
   });
+  else if (f === 'relform') run(addRelative);
+  else if (f === 'personform') run(savePerson);
   else if (f === 'inviteform') run(async () => {
     const email = $('#iv-email').value.trim().toLowerCase();
     try { await store.addInvite(email); } catch (e) { if (/duplicate|unique/i.test(e.message || '')) { toast('That person is already invited.'); return; } throw e; }

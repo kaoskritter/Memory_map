@@ -37,9 +37,9 @@ export async function startMock(port) {
     return asUser(c, async () => {
       if (req.method === 'GET') { const o = q.get('order'); return (await db.query(`select ${sel} from public.${table}${w}${o ? ' order by ' + ident(o.split('.')[0]) : ''}`, params)).rows; }
       if (req.method === 'DELETE') { await db.query(`delete from public.${table}${w}`, params); return []; }
-      const cols = Object.keys(body).map(ident).join(', ');
+      const many = Array.isArray(body), cols = Object.keys(many ? body[0] : body).map(ident).join(', ');
       params.push(JSON.stringify(body)); const j = `$${params.length}::jsonb`;
-      if (req.method === 'POST') return (await db.query(`insert into public.${table} (${cols}) select ${cols} from jsonb_populate_record(null::public.${table}, ${j})${wantsRows ? ' returning ' + sel : ''}`, params)).rows;
+      if (req.method === 'POST') return (await db.query(`insert into public.${table} (${cols}) select ${cols} from ${many ? 'jsonb_populate_recordset' : 'jsonb_populate_record'}(null::public.${table}, ${j})${wantsRows ? ' returning ' + sel : ''}`, params)).rows;
       if (req.method === 'PATCH') return (await db.query(`update public.${table} set (${cols}) = (select ${cols} from jsonb_populate_record(null::public.${table}, ${j}))${w}${wantsRows ? ' returning ' + sel : ''}`, params)).rows;
       throw new Error('unsupported method');
     });

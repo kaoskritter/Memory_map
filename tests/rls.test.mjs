@@ -55,11 +55,35 @@ test('an invited relative can sign up, join, read, and add memories and photos o
   await denied(as('kin', `insert into photos(map_id,event_id,uploaded_by,path) values ($1,$2,$3,'00000000-0000-0000-0000-0000000000ff/x.jpg')`, [mapId, eventId, U.kin]));
 });
 
+let subjectId, arthurId;
+test('a new map gets its centre person, and everyone on the map can build the family tree', async () => {
+  const s = await as('owner', `select id, is_subject from people where map_id=$1`, [mapId]);
+  assert.equal(s.rows.length, 1); assert.equal(s.rows[0].is_subject, true); subjectId = s.rows[0].id;
+  // an invited relative adds a person, joins them to the tree, and links them to a place
+  arthurId = (await as('kin', `insert into people(map_id,name,created_by) values ($1,'Arthur',$2) returning id`, [mapId, U.kin])).rows[0].id;
+  await as('kin', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$3,'parent',$4)`, [mapId, arthurId, subjectId, U.kin]);
+  await as('kin', `insert into event_people(map_id,event_id,person_id,added_by) values ($1,$2,$3,$4)`, [mapId, eventId, arthurId, U.kin]);
+  assert.equal((await as('kin', `update people set born='about 1905' where id=$1`, [arthurId])).affectedRows, 1);
+  assert.equal((await as('owner', `select * from event_people`)).rows.length, 1, 'owner sees it');
+  // the centre person cannot be removed, duplicated, or moved to another map
+  assert.equal((await as('kin', `delete from people where id=$1`, [subjectId])).affectedRows, 0);
+  await denied(as('kin', `insert into people(map_id,is_subject,created_by) values ($1,true,$2)`, [mapId, U.kin]));
+  await as('kin', `update people set map_id='00000000-0000-0000-0000-0000000000ff', is_subject=false where id=$1`, [subjectId]);
+  const still = (await db.query(`select map_id, is_subject from people where id=$1`, [subjectId])).rows[0];
+  assert.equal(still.map_id, mapId); assert.equal(still.is_subject, true);
+  // cannot sign someone else's name to a new person or link
+  await denied(as('kin', `insert into people(map_id,name,created_by) values ($1,'X',$2)`, [mapId, U.owner]));
+  await denied(as('kin', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$2,'partner',$3)`, [mapId, arthurId, U.kin]));
+});
+
 test('a stranger with an account sees and changes nothing', async () => {
   await db.query(`insert into beta_allowlist(email) values ($1)`, [MAIL.stranger]);
   await db.query(`insert into auth.users values ($1,$2)`, [U.stranger, MAIL.stranger]);
-  for (const t of ['maps', 'events', 'memories', 'photos', 'invites', 'map_members'])
+  for (const t of ['maps', 'events', 'memories', 'photos', 'invites', 'map_members', 'people', 'family_links', 'event_people'])
     assert.equal((await as('stranger', `select * from ${t}`)).rows.length, 0, t);
+  await denied(as('stranger', `insert into people(map_id,name,created_by) values ($1,'X',$2)`, [mapId, U.stranger]));
+  assert.equal((await as('stranger', `update people set name='X' where map_id=$1`, [mapId])).affectedRows, 0);
+  assert.equal((await as('stranger', `delete from family_links where map_id=$1`, [mapId])).affectedRows, 0);
   assert.equal((await as('stranger', `select * from storage.objects`)).rows.length, 0);
   await denied(as('stranger', `insert into memories(map_id,event_id,author_id,body) values ($1,$2,$3,'x')`, [mapId, eventId, U.stranger]));
   await denied(as('stranger', `insert into storage.objects(bucket_id,name) values ('photos',$1)`, [`${mapId}/x.jpg`]));
@@ -70,7 +94,7 @@ test('a stranger with an account sees and changes nothing', async () => {
 
 test('signed-out visitors can read nothing', async () => {
   await db.exec(`select set_config('request.jwt.claims','{}',false); set role anon;`);
-  try { for (const t of ['maps', 'events', 'memories', 'photos']) await denied(db.query(`select * from ${t}`)); }
+  try { for (const t of ['maps', 'events', 'memories', 'photos', 'people', 'family_links', 'event_people']) await denied(db.query(`select * from ${t}`)); }
   finally { await db.exec('reset role'); }
 });
 
@@ -84,6 +108,6 @@ test('the owner cannot give the map away, can remove any memory, and removing an
 
 test('deleting a map removes its events, memories and photo records', async () => {
   await as('owner', `delete from maps where id=$1`, [mapId]);
-  for (const t of ['events', 'memories', 'photos', 'invites', 'map_members'])
+  for (const t of ['events', 'memories', 'photos', 'invites', 'map_members', 'people', 'family_links', 'event_people'])
     assert.equal((await db.query(`select * from ${t}`)).rows.length, 0, t);
 });
