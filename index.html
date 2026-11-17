@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Memory Map: a life story, told through its places.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#172A2D">
+<title>Memory Map</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+</head>
+<body data-screen="gate" data-view="both">
+<a class="skip" href="#tl">Skip to the timeline</a>
+<div class="gate" id="gate"><div class="gatecard"><p class="brand">Memory Map</p><p>One moment…</p></div></div>
+<div class="app">
+  <header class="top" id="top"></header>
+  <div class="sample" id="sample" hidden>
+    <p><b>This is a made-up example</b> so you can see how a Memory Map works. Peggy is not a real person, and changes you make here are not kept.</p>
+    <button class="btn" data-act="leavedemo">Leave the example</button>
+  </div>
+  <nav class="tabs" aria-label="Ways to look at the story">
+    <button class="tab" data-act="view" data-v="both">Map and timeline</button>
+    <button class="tab" data-act="view" data-v="map">Map</button>
+    <button class="tab" data-act="view" data-v="timeline">Timeline</button>
+    <button class="tab" data-act="view" data-v="photos">Photos</button>
+    <span class="spacer"></span>
+    <button class="btn quiet filtertoggle" data-act="filters" aria-expanded="false">Choose what to show</button>
+  </nav>
+  <main>
+    <aside class="filters" id="filters" aria-label="Choose what to show"></aside>
+    <div class="stage">
+      <section class="pane mapp" aria-label="Map"><div id="map"></div><div class="preview" id="preview" aria-live="polite"></div></section>
+      <section class="pane tl" aria-label="Timeline"><div class="tlscroll" id="tl" tabindex="-1"></div></section>
+      <section class="pane gal" aria-label="Photos"><div class="galgrid" id="gal"></div></section>
+    </div>
+  </main>
+  <div class="edit" id="edit"></div>
+</div>
+<dialog id="story" aria-label="Story"></dialog>
+<dialog id="settings" aria-label="Settings"></dialog>
+<dialog id="privacy" aria-label="How we look after your stories"></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+<noscript><p style="padding:2rem;font:1.2rem sans-serif">Memory Map needs JavaScript turned on in your browser.</p></noscript>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
