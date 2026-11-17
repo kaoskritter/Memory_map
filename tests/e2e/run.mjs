@@ -118,7 +118,7 @@ await step('owner deletes the map and nothing is left behind', async () => {
 });
 await step('sign out returns to the sign-in screen', async () => { await helen.click('[data-act=signout]'); await helen.waitForSelector('#si-email'); });
 await step('an expired email link gets a plain explanation', async () => {
-  await helen.goto(web + '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'); await helen.waitForSelector('.notice');
+  await helen.goto('about:blank'); await helen.goto(web + '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'); await helen.waitForSelector('.notice');
   assert.match(await helen.textContent('.notice'), /expired or was already used/);
 });
 await step('phone width has no sideways scrolling', async () => {
