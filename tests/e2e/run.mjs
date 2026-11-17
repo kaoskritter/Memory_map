@@ -47,6 +47,15 @@ await step('the example opens without signing in', async () => {
   await nobody.click('[data-act=demo]'); await nobody.waitForSelector('.card'); assert.equal(await nobody.locator('.card').count(), 19); assert.equal(await nobody.locator('.pin').count(), 19);
   await nobody.screenshot({ path: join(shots, 'demo.png') });
 });
+await step('the example can join its places in order and lay out a memory book', async () => {
+  await nobody.check('#f-path'); await nobody.waitForSelector('#map path.leaflet-interactive, #map .leaflet-overlay-pane path');
+  await nobody.uncheck('#f-path'); assert.equal(await nobody.locator('#map .leaflet-overlay-pane path').count(), 0, 'line goes away');
+  await nobody.click('[data-act=settings]'); await nobody.click('[data-act=book]');
+  await nobody.waitForSelector('#book .cover h1'); assert.ok(await nobody.locator('#book .bk-place').count() > 5, 'places in the book');
+  assert.ok(await nobody.locator('#book .memory').count() > 0, 'memories in the book');
+  await nobody.screenshot({ path: join(shots, 'book.png') });
+  await nobody.click('[data-act=closebook]'); await nobody.waitForSelector('#map', { state: 'visible' });
+});
 await step('owner signs in with the emailed code and starts a map', async () => {
   await signIn(helen, 'helen@example.com'); await helen.waitForSelector('#newform');
   await helen.click('#nw-other', { force: true }); await helen.fill('#nw-name', 'Peggy Lawson'); await helen.fill('#nw-you', 'Helen'); await helen.fill('#nw-rel', 'Daughter'); await helen.click('#newform button[type=submit]');

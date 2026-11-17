@@ -34,6 +34,7 @@ const sortKey = (e) => { const r = range(e); return r ? r.from : 99999; };
 const whenLabel = (e) => (e.when ? e.when.charAt(0).toUpperCase() + e.when.slice(1) : 'Not sure when');
 function placeLabel(e) { const a = e.addr || {}; if (e.precision === 'approx') return a.rough || a.town || a.country || ''; return [a.street, a.town].filter(Boolean).join(', ') || a.state || a.country || ''; }
 const memorial = () => S.mode === 'memorial';
+const factsOf = (e) => { const x = e.extra || {}; return [x.type, x.course, x.role, x.deferred && 'Time off: ' + x.deferred].filter(Boolean).join(' · '); };
 const catOn = (id) => prefs.filters[id] !== false;
 const allowed = (e) => CAT[e.cat] && (!CAT[e.cat].memorial || memorial());
 const visible = () => S.events.filter((e) => allowed(e) && catOn(e.cat)).sort((a, b) => sortKey(a) - sortKey(b));
@@ -131,13 +132,14 @@ function renderFilters() {
   const counts = {}; S.events.forEach((e) => { counts[e.cat] = (counts[e.cat] || 0) + 1; });
   $('#filters').innerHTML = '<h2>Show on the map</h2>' + CATS.filter((c) => !c.memorial || memorial()).map((c) =>
     `<label><input type="checkbox" id="f-${c.id}" data-f="${c.id}"${catOn(c.id) ? ' checked' : ''}>${badge(c.id)}<span>${c.name}</span><span class="n">${counts[c.id] || 0}</span></label>`).join('') +
-    '<div class="row"><button class="btn quiet" data-act="fall" data-on="1">Show all</button><button class="btn quiet" data-act="fall" data-on="0">Hide all</button></div>';
+    '<div class="row"><button class="btn quiet" data-act="fall" data-on="1">Show all</button><button class="btn quiet" data-act="fall" data-on="0">Hide all</button></div>' +
+    `<label class="pathopt"><input type="checkbox" id="f-path"${prefs.path ? ' checked' : ''}><span class="pathicon" aria-hidden="true"></span><span>Join the places in order<small>A dotted line from the earliest place to the latest</small></span></label>`;
 }
 
 /* =====================================================================
    Map
    ===================================================================== */
-let map, markers = {};
+let map, markers = {}, pathLine = null;
 const pinIcon = (cat) => { const c = CAT[cat]; return L.divIcon({ className: '', html: `<div class="pin" style="--c:${c.c}"><svg viewBox="0 0 24 24">${c.i}</svg></div>`, iconSize: [46, 46], iconAnchor: [23, 23] }); };
 const tiles = (m) => L.tileLayer(TILE_URL, { maxZoom: 19, attribution: TILE_ATTR }).addTo(m);
 function initMap() {
@@ -154,6 +156,10 @@ function renderMap() {
     m.on('mouseover', () => setHot(e.id)); m.on('mouseout', () => setHot(null));
     markers[e.id] = m;
   });
+  // The journey: a dotted line through the dated, pinned places, earliest first.
+  if (pathLine) { pathLine.remove(); pathLine = null; }
+  const stops = prefs.path ? visible().filter((e) => e.lat != null && range(e)) : [];
+  if (stops.length > 1) pathLine = L.polyline(stops.map((e) => [e.lat, e.lng]), { color: '#1B2A41', weight: 4, opacity: 0.75, dashArray: '1 10', lineCap: 'round', interactive: false }).addTo(map);
   paint();
 }
 function fitHome() {
@@ -215,7 +221,7 @@ function renderGallery() {
 function openStory(id, keepText) {
   const e = byId(id); if (!e) return; sel = id; renderTimeline(); renderPreview(); paint();
   const r = range(e), then = r ? nameAt(r.from) : null, s = S.subject, x = e.extra || {};
-  const facts = [x.type, x.course, x.role].filter(Boolean).join(' · ');
+  const facts = factsOf(e);
   const canRemove = (it) => owner() || it.mine;
   $('#story').innerHTML = `<div class="dlg"><header>${badge(e.cat)}<div><h2>${esc(e.title)}</h2><p class="meta">${esc(whenLabel(e))} · ${esc(placeLabel(e))}${e.precision === 'approx' ? '<span class="rough">roughly</span>' : ''}</p>${
     facts ? `<p class="meta">${esc(facts)}</p>` : ''}${e.people ? `<p class="meta">With ${esc(e.people)}</p>` : ''}${then && then !== s.preferred ? `<p class="meta">Known then as ${esc(then)}</p>` : ''}</div><button class="btn quiet" data-act="close">Close</button></header>
@@ -284,7 +290,7 @@ function formHtml(c) {
     : fld('e-street', 'Street', a.street, 'Leave blank if you are not sure') + `<div class="two">${fld('e-town', 'Suburb or town', a.town)}${fld('e-state', 'State or region', a.state)}</div>` + fld('e-country', 'Country', a.country);
   h += `<div class="field"><span class="flabel">Put the pin on the map</span><span class="hint">Tap the map where this was. Close enough is fine.</span><div id="pick"></div><div class="rowbtns"><button class="btn" type="button" data-act="geocode">Find it for me</button><span class="hint" id="geomsg" role="status">Looking it up sends the address to OpenStreetMap.</span></div></div>${
     fld('e-when', 'When was this?', d.when, 'A year, a few years, or a rough time like “early 1960s”.')}<p class="understood" id="understood">${understood(parseWhen(d.when), d.when)}</p>`;
-  if (c.id === 'school') h += `<div class="two"><div class="field"><label for="e-type">What kind of school?</label><select id="e-type">${['', 'Primary', 'Secondary', 'College or university', 'Trade or night school', 'Other'].map((o) => `<option${x.type === o ? ' selected' : ''}>${o}</option>`).join('')}</select></div>${fld('e-course', 'Course or subject', x.course, 'Optional')}</div>`;
+  if (c.id === 'school') h += `<div class="two"><div class="field"><label for="e-type">What kind of school?</label><select id="e-type">${['', 'Kindergarten or preschool', 'Primary', 'Secondary', 'College or university', 'Trade or night school', 'Other'].map((o) => `<option${x.type === o ? ' selected' : ''}>${o}</option>`).join('')}</select></div>${fld('e-course', 'Course or subject', x.course, 'Optional')}</div>${fld('e-deferred', 'Any time off or years deferred?', x.deferred, 'Optional. For example “took 1975 off to work on the farm”.')}`;
   if (c.id === 'work') h += fld('e-role', 'What was the job?', x.role, 'Optional');
   h += `${fld('e-people', 'Who else was part of this?', d.people, 'Optional', 500)}<div class="field"><label for="e-mem">A memory of this place</label><span class="hint">Optional. A sentence or two is plenty.</span><textarea id="e-mem" maxlength="5000">${esc(d.newMemory || '')}</textarea></div>
    <div class="field"><span class="flabel">Photos</span><div class="thumbs">${d.photos.map((p, i) => `<figure><img src="${esc(p.src)}" alt="${esc(p.cap || 'Photo ' + (i + 1))}"><button type="button" data-act="delphoto" data-i="${i}" aria-label="Remove photo ${i + 1}">×</button></figure>`).join('')}</div><div class="rowbtns"><label class="btn" for="e-photo">Add a photo</label><input class="sr" type="file" id="e-photo" accept="image/*" data-photo="draft"></div></div>`;
@@ -296,7 +302,7 @@ function readForm() {
   if (!draft || !$('#form')) return; const v = (id) => { const el = $('#' + id); return el ? el.value.trim() : undefined; }, a = draft.addr;
   draft.title = v('e-title') || ''; draft.when = v('e-when') || ''; draft.people = v('e-people') || ''; draft.newMemory = v('e-mem') || '';
   ['street', 'town', 'state', 'country', 'rough'].forEach((k) => { const x = v('e-' + k); if (x !== undefined) a[k] = x; });
-  ['type', 'course', 'role'].forEach((k) => { const x = v('e-' + k); if (x !== undefined) draft.extra[k] = x; });
+  ['type', 'course', 'role', 'deferred'].forEach((k) => { const x = v('e-' + k); if (x !== undefined) draft.extra[k] = x; });
 }
 let pick = null, pickM = null;
 function initPicker() {
@@ -360,10 +366,10 @@ async function renderSettings(panel) {
   }
   h += '<div class="rowbtns">';
   if (!S.demo) {
-    h += '<button class="btn" data-act="export">Download a copy</button>';
+    h += '<button class="btn" data-act="book">Make a memory book to print</button><button class="btn" data-act="export">Download a copy</button>';
     if (myMaps.length > 1) h += '<button class="btn" data-act="choose">Switch Memory Map</button>';
     h += '<button class="btn" data-act="gatenew">Start another Memory Map</button><button class="btn" data-act="signout">Sign out</button>';
-  } else h += '<button class="btn primary" data-act="leavedemo">Leave the example</button>';
+  } else h += '<button class="btn" data-act="book">Make a memory book to print</button><button class="btn primary" data-act="leavedemo">Leave the example</button>';
   h += '<button class="btn quiet" data-act="privacy">How we look after your stories</button></div>';
   if (owner() && !S.demo) h += panel === 'askdelete' ? '<div class="confirm"><p><b>Delete this whole Memory Map?</b> Every place, memory and photo will be removed for everyone, and it cannot be brought back. Consider downloading a copy first.</p><button class="btn danger" data-act="deletemap">Yes, delete everything</button><button class="btn" data-act="settings">Keep it</button></div>' : '<p><button class="link danger" data-act="askdeletemap">Delete this Memory Map…</button></p>';
   $('#settings').innerHTML = h + '</div>'; const d = $('#settings'); if (!d.open) d.showModal();
@@ -379,6 +385,27 @@ function showPrivacy() {
    <li><b>This is an early version.</b> Please keep your own copies of precious photos.</li></ul></div>`;
   $('#privacy').showModal();
 }
+// A memory book: the whole story laid out as pages, oldest first, ready to print or save as a PDF.
+function showBook() {
+  const s = S.subject, name = s.preferred || 'Someone special', ev = S.events.filter(allowed).sort((a, b) => sortKey(a) - sortKey(b));
+  const life = memorial() ? [s.born, s.died].filter(Boolean).join(' – ') : (s.born ? 'Born ' + s.born : '');
+  const names = [s.birthName && s.birthName !== s.preferred ? 'Born ' + s.birthName : '', ...(s.changes || []).map((c) => [c.name, c.year && 'from ' + c.year].filter(Boolean).join(', '))].filter(Boolean);
+  let h = `<div class="bookbar"><p><b>This is how the memory book will print.</b> Choose “Save as PDF” in the print window to keep or email a copy.</p><div class="rowbtns"><button class="btn primary" data-act="printbook">Print or save</button><button class="btn" data-act="closebook">Back to the map</button></div></div>
+   <article class="pages"><header class="cover"><p class="brand">Memory Map</p><h1>${memorial() ? 'In loving memory of ' + esc(name) : 'The story of ' + esc(name)}</h1>${life ? `<p class="life">${esc(life)}</p>` : ''}${names.length ? `<p class="meta">${esc(names.join(' · '))}</p>` : ''}<p class="meta">${ev.length} ${ev.length === 1 ? 'place' : 'places'}, told by the people who were there.</p></header>`;
+  let cur = null;
+  ev.forEach((e) => {
+    const r = range(e), g = r ? Math.floor(r.from / 10) * 10 + 's' : 'Not sure when', facts = factsOf(e), where = placeLabel(e);
+    if (g !== cur) { h += `<h2 class="bk-decade">${g}</h2>`; cur = g; }
+    h += `<section class="bk-place"><h3>${esc(e.title)}</h3><p class="meta">${esc([CAT[e.cat].name, whenLabel(e), where && (e.precision === 'approx' ? 'around ' : '') + where].filter(Boolean).join(' · '))}</p>${facts ? `<p class="meta">${esc(facts)}</p>` : ''}${e.people ? `<p class="meta">With ${esc(e.people)}</p>` : ''}${
+      e.memories.map((m) => `<blockquote class="memory"><p>${esc(m.text)}</p><footer>${esc(m.by)}</footer></blockquote>`).join('')}${
+      e.photos.length ? `<div class="bk-photos">${e.photos.map((p) => `<img src="${esc(p.src)}" alt="${esc(p.cap || 'Photo from ' + e.title)}">`).join('')}</div>` : ''}</section>`;
+  });
+  if (!ev.length) h += '<p class="empty">There are no places yet. Add some, then come back to make the book.</p>';
+  h += `<p class="bk-end">Put together with Memory Map, ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}.</p></article>`;
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  $('#book').innerHTML = h; document.body.dataset.screen = 'book'; window.scrollTo(0, 0); $('#book button').focus();
+}
+function closeBook() { document.body.dataset.screen = 'app'; $('#book').innerHTML = ''; if (map) setTimeout(() => map.invalidateSize(), 30); }
 function exportCopy() {
   const data = { exported: new Date().toISOString(), about: S.subject, kind: S.mode, places: S.events.map((e) => ({ category: CAT[e.cat].name, title: e.title, when: e.when, address: e.addr, addressIsRough: e.precision === 'approx', latitude: e.lat, longitude: e.lng, details: e.extra, people: e.people, memories: e.memories.map((m) => ({ by: m.by, text: m.text })), photoCount: e.photos.length })) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
@@ -427,6 +454,7 @@ document.addEventListener('click', (ev) => {
     openmap: () => run(() => openMap(id)),
     signout: () => run(async () => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); await sb.auth.signOut(); }),
     export: () => exportCopy(),
+    book: () => showBook(), printbook: () => window.print(), closebook: () => closeBook(),
     askdeletemap: () => run(() => renderSettings('askdelete')),
     deletemap: () => run(async () => { await store.deleteMap(S); $('#settings').close(); prefs.lastMap = null; savePrefs(); S = null; await afterSignIn(); toast('That Memory Map has been deleted.'); }),
     delinvite: () => run(async () => { await store.removeInvite(id); await renderSettings(); }),
@@ -450,7 +478,8 @@ document.addEventListener('click', (ev) => {
 });
 document.addEventListener('change', (ev) => {
   const t = ev.target;
-  if (t.dataset.f) { prefs.filters[t.dataset.f] = t.checked; savePrefs(); if (sel && !visible().some((e) => e.id === sel)) sel = null; renderMap(); renderTimeline(); renderPreview(); renderGallery(); }
+  if (t.id === 'f-path') { prefs.path = t.checked; savePrefs(); renderMap(); }
+  else if (t.dataset.f) { prefs.filters[t.dataset.f] = t.checked; savePrefs(); if (sel && !visible().some((e) => e.id === sel)) sel = null; renderMap(); renderTimeline(); renderPreview(); renderGallery(); }
   else if (t.name === 'prec') { readForm(); draft.precision = t.value; renderEdit(); $('#p-' + (t.value === 'approx' ? 'a' : 'd')).focus(); }
   else if (t.name === 'size') { prefs.size = t.value; savePrefs(); document.documentElement.dataset.size = t.value; if (map) map.invalidateSize(); }
   else if (t.name === 'mode') run(async () => { const was = S.mode; S.mode = t.value; try { await store.saveSubject(S); } catch (e) { S.mode = was; throw e; } finally { refresh(); if (S.view === 'edit') renderEdit(); } });
