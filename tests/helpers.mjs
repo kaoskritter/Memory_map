@@ -1,5 +1,5 @@
 // A minimal stand-in for the parts of Supabase the migration depends on, for running it in PGlite.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
@@ -17,6 +17,7 @@ export async function freshDb() {
     grant usage on schema public, auth, storage to anon, authenticated;
     grant all on storage.objects to authenticated;
   `);
-  await db.exec(readFileSync(new URL('../supabase/migrations/0001_init.sql', import.meta.url), 'utf8'));
+  const dir = new URL('../supabase/migrations/', import.meta.url);
+  for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
   return db;
 }

@@ -21,7 +21,7 @@ This repository is the invite-only beta: a static web app (Vite, plain JavaScrip
 ### 1. Supabase
 
 1. Create a project at supabase.com. **Choose the Sydney (ap-southeast-2) region**: the in-app privacy note tells people their stories are kept in Sydney.
-2. SQL Editor: paste and run `supabase/migrations/0001_init.sql`.
+2. SQL Editor: paste and run each file in `supabase/migrations/`, in order.
 3. Add yourself to the beta list (SQL Editor):
    ```sql
    insert into public.beta_allowlist (email, note) values ('you@example.com', 'founder');
