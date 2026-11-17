@@ -24,7 +24,7 @@ export function demoStore() {
     async addInvite() { throw new Error('demo'); },
     async removeInvite() {},
     async deleteMap() {},
-    async addPerson(p) { return { id: uuid(), subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '' }; },
+    async addPerson(p) { return { id: uuid(), subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '', kind: p.kind || 'family' }; },
     async updatePerson() {},
     async deletePerson() {},
     async addLinks(list) { return list.map((l) => ({ id: uuid(), ...l })); },
@@ -69,7 +69,7 @@ export async function loadMap(mapId, userId) {
   const mems = byEvent(memories), phs = byEvent(photos), who = byEvent(eventPeople);
   return {
     demo: false, mapId, role: map.owner_id === userId ? 'owner' : 'contributor', mode: map.mode, subject: rowToSubject(map),
-    people: people.map((r) => ({ id: r.id, subject: r.is_subject, name: r.name, born: r.born, died: r.died, note: r.note, sex: r.sex || '' })),
+    people: people.map((r) => ({ id: r.id, subject: r.is_subject, name: r.name, born: r.born, died: r.died, note: r.note, sex: r.sex || '', kind: r.kind || 'family' })),
     links: links.map((r) => ({ id: r.id, from: r.from_id, to: r.to_id, kind: r.kind })),
     events: events.map((r) => ({
       id: r.id, cat: r.category, title: r.title, precision: r.precision, addr: r.addr || {}, lat: r.lat, lng: r.lng, when: r.when_text, extra: r.extra || {}, people: r.people,
@@ -118,8 +118,9 @@ export function cloudStore(mapId, userId) {
     async addInvite(email) { return ok(await sb.from('invites').insert({ map_id: mapId, email: email.toLowerCase(), invited_by: userId }).select('id, email, accepted_at').single()); },
     async removeInvite(id) { ok(await sb.from('invites').delete().eq('id', id)); },
     async addPerson(p) {
-      const r = ok(await sb.from('people').insert({ map_id: mapId, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '', created_by: userId }).select('id').single());
-      return { id: r.id, subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '' };
+      const kind = p.kind === 'friend' ? 'friend' : 'family';
+      const r = ok(await sb.from('people').insert({ map_id: mapId, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '', kind, created_by: userId }).select('id').single());
+      return { id: r.id, subject: false, name: p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.sex || '', kind };
     },
     async updatePerson(p) { ok(await sb.from('people').update({ name: p.subject ? '' : p.name, born: p.born || '', died: p.died || '', note: p.note || '', sex: p.subject ? '' : (p.sex || '') }).eq('id', p.id)); },
     async deletePerson(p) { ok(await sb.from('people').delete().eq('id', p.id)); },

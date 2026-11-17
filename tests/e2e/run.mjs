@@ -63,6 +63,8 @@ await step('the example family tree draws, names relationships, and links people
   await nobody.screenshot({ path: join(shots, 'family.png') });
   await nobody.click('.pcard[title="Ted Lawson"]'); await nobody.waitForSelector('#person h2');
   assert.match(await nobody.textContent('#person'), /Partner of Peggy/); assert.match(await nobody.textContent('.pcard[title="Joan Hartley"]'), /Sister/); assert.match(await nobody.textContent('#person'), /Married Ted Lawson/);
+  assert.equal(await nobody.locator('.famfriends .pcard').count(), 2, 'friends sit beside the tree');
+  assert.match(await nobody.textContent('.pcard[title="Dot Kelly"]'), /Friend/);
   await nobody.click('#person [data-act=openfromperson] >> nth=0'); await nobody.waitForSelector('#story .chip');
   assert.match(await nobody.textContent('#story .chips'), /Ted Lawson/); await nobody.click('#story [data-act=close]');
   await nobody.click('[data-v=both]');
@@ -103,6 +105,21 @@ await step('owner starts the family tree', async () => {
   const r = (await mock.db.query(`select kind from family_links`)).rows; assert.deepEqual(r, [{ kind: 'parent' }]);
   await helen.click('[data-v=both]');
 });
+await step('owner adds a friend, linked to a place, who stays out of the tree', async () => {
+  await helen.click('[data-v=family]'); await helen.waitForSelector('.famfriends'); await helen.click('.famfriends [data-act=addfriend]');
+  await helen.waitForSelector('#friendform'); await helen.fill('#fr-name', 'Dot Kelly'); await helen.fill('#fr-note', 'From teachers’ college');
+  await helen.selectOption('#fr-place', { index: 1 }); await helen.click('#friendform button[type=submit]');
+  await helen.waitForFunction(() => document.querySelectorAll('.famfriends .pcard').length === 1);
+  assert.match(await helen.textContent('#person'), /Friend of Peggy/); assert.match(await helen.textContent('#person'), /Electra Street/);
+  assert.equal(await helen.locator('#person [data-act=relpanel]').count(), 0, 'no family links for friends');
+  await helen.click('#person [data-act=close]'); assert.equal(await helen.locator('.famtree .pcard').count(), 2, 'tree unchanged');
+  const r = (await mock.db.query(`select kind, note from people where name='Dot Kelly'`)).rows[0]; assert.deepEqual(r, { kind: 'friend', note: 'From teachers’ college' });
+  assert.equal((await mock.db.query(`select count(*)::int n from event_people`)).rows[0].n, 1);
+  // the place's picker lists family, then friends, then Peggy herself last
+  await helen.click('[data-v=both]'); await helen.goto(web); await helen.waitForSelector('.card'); await helen.click('.card'); await helen.click('.more [data-act=open]'); await helen.waitForSelector('#w-add');
+  const groups = await helen.locator('#w-add optgroup').evaluateAll((g) => g.map((x) => x.label)); assert.deepEqual(groups, ['Family', 'This Memory Map']);
+  assert.match(await helen.textContent('#story .chips'), /Dot Kelly/); await helen.click('#story [data-act=close]');
+});
 await step('owner invites a relative', async () => {
   await helen.click('[data-act=settings]'); await helen.waitForSelector('#iv-email'); await helen.fill('#iv-email', 'Tom@Example.com'); await helen.click('#inviteform button[type=submit]');
   await helen.waitForSelector('#invtext'); assert.match(await helen.textContent('#settings'), /tom@example.com/); await helen.click('#settings [data-act=close]');
@@ -125,8 +142,8 @@ await step('the relative adds a partner to the tree and links him to a place', a
   await tom.click('#relform button[type=submit]'); await tom.waitForFunction(() => document.querySelectorAll('.famtree .pcard').length === 3);
   await tom.click('#person [data-act=close]'); await tom.click('.pcard[title="Ted Lawson"]'); await tom.waitForSelector('#pp-add');
   await tom.selectOption('#pp-add', { index: 1 }); await tom.click('[data-act=linkplace]'); await tom.waitForSelector('#person [data-act=openfromperson]');
-  assert.equal((await mock.db.query(`select count(*)::int n from event_people`)).rows[0].n, 1);
-  assert.equal((await mock.db.query(`select count(*)::int n from people`)).rows[0].n, 3);
+  assert.equal((await mock.db.query(`select count(*)::int n from event_people`)).rows[0].n, 2);
+  assert.equal((await mock.db.query(`select count(*)::int n from people`)).rows[0].n, 4);
   await tom.click('#person [data-act=close]');
 });
 await step('owner sees the relative’s memory, switches to memorial, and it sticks', async () => {

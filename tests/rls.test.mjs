@@ -76,6 +76,23 @@ test('a new map gets its centre person, and everyone on the map can build the fa
   await denied(as('kin', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$2,'partner',$3)`, [mapId, arthurId, U.kin]));
 });
 
+test('everyone on the map can add friends, link them to places, but never into the family tree', async () => {
+  const sas = (await as('kin', `insert into people(map_id,name,kind,note,created_by) values ($1,'Sas','friend','From uni',$2) returning id, kind`, [mapId, U.kin])).rows[0];
+  assert.equal(sas.kind, 'friend');
+  await as('kin', `insert into event_people(map_id,event_id,person_id,added_by) values ($1,$2,$3,$4)`, [mapId, eventId, sas.id, U.kin]);
+  assert.equal((await as('owner', `select * from people where kind='friend'`)).rows.length, 1, 'owner sees the friend');
+  // friends stay out of the tree, either way round
+  await denied(as('kin', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$3,'sibling',$4)`, [mapId, sas.id, subjectId, U.kin]));
+  await denied(as('owner', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$3,'partner',$4)`, [mapId, subjectId, sas.id, U.owner]));
+  // a relative with connections can't quietly become a friend; the centre person is always family
+  await denied(as('kin', `update people set kind='friend' where id=$1`, [arthurId]));
+  await denied(as('owner', `update people set kind='friend' where id=$1`, [subjectId]));
+  // a friend can be corrected to family, then joined to the tree
+  assert.equal((await as('owner', `update people set kind='family' where id=$1`, [sas.id])).affectedRows, 1);
+  await as('owner', `insert into family_links(map_id,from_id,to_id,kind,created_by) values ($1,$2,$3,'sibling',$4)`, [mapId, sas.id, subjectId, U.owner]);
+  assert.equal((await as('owner', `delete from people where id=$1`, [sas.id])).affectedRows, 1);
+});
+
 test('a stranger with an account sees and changes nothing', async () => {
   await db.query(`insert into beta_allowlist(email) values ($1)`, [MAIL.stranger]);
   await db.query(`insert into auth.users values ($1,$2)`, [U.stranger, MAIL.stranger]);
