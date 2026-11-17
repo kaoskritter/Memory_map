@@ -63,3 +63,20 @@ export function sample(){
   at('The unit near Helen, Geelong',[helen,mark,tom]);at('Eastern Beach',[tom]);at('Resting place, beside Ted',[ted]);
   return o;
 }
+
+// A made-up friend's Memory Map, connected to Peggy's, so the example can show "Where our paths crossed".
+// Places only, as a real connection shares: no memories or photos.
+export function sampleConnection(){
+  var n=0,D=function(cat,title,when,from,to,lat,lng,town){return {mapId:'dot',mapName:'Dot Kelly',id:'d'+(++n),cat:cat,title:title,when:when,from:from,to:to,lat:lat,lng:lng,town:town}};
+  return {
+    connections:[{id:'c1',direction:'sent',other_name:'Dot Kelly',other_email:'',accepted:true}],
+    places:[
+      D('birth','Born in Bendigo','1937',1937,1937,-36.757,144.279,'Bendigo'),
+      D('school','Teachers’ college in Carlton','1956 to 1958',1956,1958,-37.7978,144.9615,'Carlton'),
+      D('home','Shared flat in Fitzroy','1957 to 1960',1957,1960,-37.799,144.978,'Fitzroy'),
+      D('work','Teaching in Footscray','1961 to 1968',1961,1968,-37.80,144.90,'Footscray'),
+      D('fav','Holidays at Anglesea','1970s',1970,1979,-38.405,144.186,'Anglesea'),
+      D('home','Retired to Queenscliff','since 1990',1990,null,-38.267,144.661,'Queenscliff')
+    ]
+  };
+}

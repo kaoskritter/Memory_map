@@ -109,6 +109,43 @@ test('a stranger with an account sees and changes nothing', async () => {
   await denied(as('stranger', `select * from beta_allowlist`));
 });
 
+test('two owners can connect maps and see each other’s places only; nobody else sees anything', async () => {
+  const samMap = (await as('stranger', `insert into maps(owner_id, preferred_name) values ($1,'Sam') returning id`, [U.stranger])).rows[0].id;
+  const samPlace = (await as('stranger', `insert into events(map_id, category, title, lat, lng, year_from, year_to, addr) values ($1,'home','Sam’s flat',-37.86,144.89,1961,1964,'{"street":"1 Secret St","town":"Williamstown"}') returning id`, [samMap])).rows[0].id;
+  await as('stranger', `insert into events(map_id, category, title) values ($1,'end','Resting place')`, [samMap]);
+  await as('stranger', `insert into memories(map_id,event_id,author_id,body) values ($1,$2,$3,'private memory')`, [samMap, samPlace, U.stranger]);
+  // nothing is shared before asking
+  assert.equal((await as('owner', `select * from connected_places($1)`, [mapId])).rows.length, 0);
+  // only the owner can ask; not a contributor, not to yourself
+  await denied(as('kin', `insert into map_connections(from_map,to_email,requested_by) values ($1,$2,$3)`, [mapId, MAIL.stranger, U.kin]));
+  await denied(as('owner', `insert into map_connections(from_map,to_email,requested_by) values ($1,$2,$3)`, [mapId, MAIL.owner, U.owner]));
+  await denied(as('owner', `insert into map_connections(from_map,to_email,requested_by,to_map,accepted_at) values ($1,$2,$3,$4,now())`, [mapId, MAIL.stranger, U.owner, samMap]));
+  const conn = (await as('owner', `insert into map_connections(from_map,to_email,requested_by) values ($1,$2,$3) returning id`, [mapId, MAIL.stranger, U.owner])).rows[0].id;
+  // still nothing until accepted; the person asked sees who is asking
+  assert.equal((await as('owner', `select * from connected_places($1)`, [mapId])).rows.length, 0);
+  const got = (await as('stranger', `select direction, other_name, other_email, accepted from list_connections($1)`, [samMap])).rows;
+  assert.deepEqual(got, [{ direction: 'received', other_name: 'Peggy', other_email: MAIL.owner, accepted: false }]);
+  // nobody else can accept it, and it can't be accepted onto someone else's map or by editing the row
+  await denied(as('kin', `select accept_connection($1,$2)`, [conn, mapId]));
+  await denied(as('stranger', `select accept_connection($1,$2)`, [conn, mapId]));
+  await denied(as('stranger', `update map_connections set to_map=$2, accepted_at=now() where id=$1`, [conn, samMap]));
+  await as('stranger', `select accept_connection($1,$2)`, [conn, samMap]);
+  // each owner now sees the other's places: no memories, no street, no farewell places on a living map
+  const theirs = (await as('owner', `select title, town, year_from, lat from connected_places($1)`, [mapId])).rows;
+  assert.deepEqual(theirs, [{ title: 'Sam’s flat', town: 'Williamstown', year_from: 1961, lat: -37.86 }]);
+  assert.equal((await as('stranger', `select title from connected_places($1)`, [samMap])).rows[0].title, 'Electra Street');
+  assert.equal((await as('owner', `select * from memories where map_id=$1`, [samMap])).rows.length, 0, 'memories stay private');
+  assert.equal((await as('owner', `select * from events where map_id=$1`, [samMap])).rows.length, 0, 'no direct reading of their map');
+  // invited family on either map see none of it
+  assert.equal((await as('kin', `select * from connected_places($1)`, [mapId])).rows.length, 0);
+  assert.equal((await as('kin', `select * from list_connections($1)`, [mapId])).rows.length, 0);
+  assert.equal((await as('kin', `select * from map_connections`)).rows.length, 0);
+  // either side can end it, and sharing stops at once
+  assert.equal((await as('stranger', `delete from map_connections where id=$1`, [conn])).affectedRows, 1);
+  assert.equal((await as('owner', `select * from connected_places($1)`, [mapId])).rows.length, 0);
+  await as('stranger', `delete from maps where id=$1`, [samMap]);
+});
+
 test('signed-out visitors can read nothing', async () => {
   await db.exec(`select set_config('request.jwt.claims','{}',false); set role anon;`);
   try { for (const t of ['maps', 'events', 'memories', 'photos', 'people', 'family_links', 'event_people']) await denied(db.query(`select * from ${t}`)); }

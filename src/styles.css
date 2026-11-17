@@ -7,6 +7,7 @@
   --fill:#E3DFD4;      /* everyday buttons */
   --fill-hover:#D8D3C5;
   --accent:#0B6B7A; --accent-deep:#085763; --accent-soft:#E0EEF0;
+  --theirs:#8A2D6B;
   --note:#FBF3D0;      /* helper notes */
   --focus:#0B5CAD; --water:#CFE0E6; --warn:#A32920; --warn-soft:#F8E6E3;
   --stripe:linear-gradient(90deg,#5E9E4B 0 16.67%,#E8B33A 0 33.33%,#E07B2E 0 50%,#C8423B 0 66.67%,#8A4B9A 0 83.33%,#2F7DB8 0);
@@ -83,6 +84,9 @@ main{flex:1;min-height:0;display:flex;gap:.9rem;padding:0 1.25rem 1.25rem}
 body[data-view="map"] .pane.tl, body[data-view="timeline"] .pane.mapp, body[data-view="photos"] .pane.mapp, body[data-view="photos"] .pane.tl{display:none}
 body:not([data-view="photos"]) .pane.gal{display:none}
 body:not([data-view="family"]) .pane.fam{display:none}
+body:not([data-view="paths"]) .pane.paths{display:none}
+body[data-view="paths"] .pane.tl{display:none}
+body[data-view="paths"] .pane.paths{flex:0 1 27rem}
 body[data-view="family"] .pane.mapp,body[data-view="family"] .pane.tl,body[data-view="family"] .filters,body[data-view="family"] .filtertoggle{display:none}
 body[data-view="edit"] main, body[data-view="edit"] .tabs{display:none}
 body:not([data-view="edit"]) .edit{display:none}
@@ -98,6 +102,8 @@ body[data-view="both"] .pane.tl{flex:0 1 25rem}
 .leaflet-control-attribution{font-size:.7rem}
 .pin{width:2.6rem;height:2.6rem;border-radius:50%;background:var(--c);border:3px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.35),0 4px 8px -2px rgba(0,0,0,.4);display:grid;place-items:center;transition:transform .15s}
 .pin svg{width:1.35rem;height:1.35rem;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pin.other{width:2.3rem;height:2.3rem;background:#fff;border:4px solid var(--theirs);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.pin.other svg{stroke:var(--theirs);width:1.15rem;height:1.15rem}
 .leaflet-marker-icon.hot .pin{transform:scale(1.2);box-shadow:0 0 0 4px var(--ink)}
 .leaflet-marker-icon.sel .pin{transform:scale(1.35);box-shadow:0 0 0 5px #fff,0 0 0 9px var(--ink)}
 .leaflet-marker-icon.sel,.leaflet-marker-icon.hot{z-index:9999!important}
@@ -125,6 +131,20 @@ body[data-view="both"] .pane.tl{flex:0 1 25rem}
 .card.sel{border-color:var(--ink);box-shadow:inset .45rem 0 0 var(--c),0 0 0 1px var(--ink);background:var(--paper)}
 .more{margin:.4rem 0 .3rem;padding:.7rem .8rem;border-left:4px solid var(--c);background:var(--paper);border-radius:0 var(--r-sm) var(--r-sm) 0;display:flex;flex-direction:column;gap:.6rem;align-items:flex-start}
 .empty{padding:1.5rem;text-align:center;color:var(--muted)}
+.pathscroll{overflow:auto;padding:1rem 1.1rem 1.3rem;flex:1;display:flex;flex-direction:column;gap:.7rem}
+.pathshead h2{font-family:var(--display);font-weight:600;font-size:1.6rem;line-height:1.15;margin:0 0 .4rem}
+.pathscroll h3{font-family:var(--display);font-style:italic;font-weight:500;font-size:1.35rem;margin:.4rem 0 0}
+.key{display:inline-block;width:1rem;height:1rem;border-radius:50%;vertical-align:-.15rem;margin:0 .35rem 0 .1rem}
+.key.mine{background:conic-gradient(#C0392B 0 25%,#2E7D32 0 50%,#1565C0 0 75%,#E08E0B 0);border:2px solid #fff;box-shadow:0 0 0 1px var(--edge)}.key.theirs{background:#fff;border:3px solid var(--theirs);margin-left:.8rem}
+.crossings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.crossing{width:100%;text-align:left;display:flex;flex-direction:column;gap:.15rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);cursor:pointer;font:inherit;color:inherit;min-height:3rem}
+.crossing:hover{background:var(--fill)}
+.crossing.sel{border:2px solid var(--ink);background:var(--accent-soft)}
+.crossing .yrs{font-weight:700;color:var(--accent-deep)}
+.crossing .pair b{font-family:var(--display);font-weight:600;font-size:1.15rem}
+.crossing .pair b.theirs{color:var(--theirs)}
+.crossing .amp{color:var(--muted);margin:0 .35rem}
+.entry.ask{border:2px solid var(--accent);background:var(--accent-soft)}
 .rough{display:inline-block;border:1.5px dashed var(--muted);border-radius:1rem;padding:0 .5rem;font-size:.85rem;color:var(--muted);margin-left:.3rem}
 
 /* gallery: photos sit like prints laid out on the desk */
@@ -301,6 +321,9 @@ legend{font-weight:700;padding:0 .4rem}
   #map{flex:none;height:60vh;min-height:18rem}
   body[data-view="both"] #map{height:42vh}
   body[data-view="both"] .pane.tl{flex:none}
+  body[data-view="paths"] #map{height:42vh}
+  body[data-view="paths"] .pane.paths{flex:none}
+  .pathscroll{overflow:visible}
   .tlscroll{overflow:visible}
   .decade{position:static}
   .edit{padding:1rem .9rem}

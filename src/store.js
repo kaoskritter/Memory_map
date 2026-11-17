@@ -31,6 +31,11 @@ export function demoStore() {
     async removeLink() {},
     async linkEvent() {},
     async unlinkEvent() {},
+    async listConnections() { return []; },
+    async requestConnection() { throw new Error('demo'); },
+    async acceptConnection() {},
+    async removeConnection() {},
+    async connectedPlaces() { return []; },
   };
 }
 
@@ -131,6 +136,14 @@ export function cloudStore(mapId, userId) {
     async removeLink(l) { ok(await sb.from('family_links').delete().eq('id', l.id)); },
     async linkEvent(e, personId) { ok(await sb.from('event_people').insert({ map_id: mapId, event_id: e.id, person_id: personId, added_by: userId })); },
     async unlinkEvent(e, personId) { ok(await sb.from('event_people').delete().eq('event_id', e.id).eq('person_id', personId)); },
+    // Connected Memory Maps: only the owner calls these; the database shares places only.
+    async listConnections() { return ok(await sb.rpc('list_connections', { my_map: mapId })); },
+    async requestConnection(email) { ok(await sb.from('map_connections').insert({ from_map: mapId, to_email: email.toLowerCase(), requested_by: userId })); },
+    async acceptConnection(id) { ok(await sb.rpc('accept_connection', { conn: id, my_map: mapId })); },
+    async removeConnection(id) { ok(await sb.from('map_connections').delete().eq('id', id)); },
+    async connectedPlaces() {
+      return ok(await sb.rpc('connected_places', { my_map: mapId })).map((r) => ({ mapId: r.map_id, mapName: r.map_name, id: r.id, cat: r.category, title: r.title, lat: r.lat, lng: r.lng, when: r.when_text, from: r.year_from, to: r.year_to, town: r.town }));
+    },
     async deleteMap(S) {
       const paths = S.events.flatMap((e) => e.photos.map((p) => p.path)).filter(Boolean);
       for (let i = 0; i < paths.length; i += 100) await sb.storage.from('photos').remove(paths.slice(i, i + 100));

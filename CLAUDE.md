@@ -13,7 +13,8 @@ Memory Map maps a person's life story across places and time: life events pinned
 ## How it is put together
 
 - Static Vite app in plain JavaScript with Leaflet. No server of our own.
-- `src/main.js` is the interface; `src/store.js` holds every Supabase call; `src/when.js` reads rough dates; `src/family.js` lays out the family tree and names relationships. Friends are `people` with `kind = 'friend'`: shown beside the tree, never in family links (enforced in `0005_friends.sql`).
+- `src/main.js` is the interface; `src/store.js` holds every Supabase call; `src/when.js` reads rough dates; `src/family.js` lays out the family tree and names relationships. Friends are `people` with `kind = 'friend'`: shown beside the tree, never in family links (enforced in `0005_friends.sql`). `src/paths.js` finds where two connected maps crossed (same place ≤ 1 km, nearby ≤ 25 km, years overlapping; each place paired once).
+- Connected maps (`0006_map_connections.sql`): owner asks by email, the other owner accepts. Only the two owners see anything, and only places through `connected_places()` (title, category, dates, pin, town/state/country — never memories, photos, people or street). Invited family see nothing.
 - Supabase (Sydney) provides sign-in, Postgres with row level security, and a private photo bucket. Schema and rules live in `supabase/migrations/`.
 - Hosted on Vercel; every merge to `main` deploys to production, and every pull request gets its own preview link.
 
