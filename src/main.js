@@ -430,6 +430,7 @@ function yearsOf(p) {
   const born = p.subject ? S.subject.born : p.born, died = p.subject ? (memorial() ? S.subject.died : '') : p.died;
   if (born && died) return born + ' – ' + died; if (born) return 'Born ' + born; if (died) return 'Died ' + died; return '';
 }
+const w3 = (p, neutral, f, m) => (p && p.sex === 'female' ? f : p && p.sex === 'male' ? m : neutral);
 const whoNames = (e) => (e.who || []).map(personById).filter(Boolean).map(pname);
 const genName = (g) => ({ '-3': 'Great-grandparents’ generation', '-2': 'Grandparents’ generation', '-1': 'Parents’ generation', 0: first(S.subject.preferred) + '’s generation', 1: 'Children’s generation', 2: 'Grandchildren’s generation', 3: 'Great-grandchildren’s generation' }[g] || 'Further generation');
 
@@ -490,7 +491,7 @@ function openPerson(id, panel) {
   let h = `<div class="dlg"><header><div><h2>${esc(pname(p))}</h2><p class="meta">${esc([p.subject ? 'The person this Memory Map is about' : (rl !== 'Family' ? rl + ' of ' + first(S.subject.preferred) : ''), yr].filter(Boolean).join(' · '))}</p></div><button class="btn quiet" data-act="close">Close</button></header>`;
   if (personPanel === 'view') {
     if (p.note) h += `<blockquote class="memory"><p>${esc(p.note)}</p></blockquote>`;
-    const fam = [['Parents', r.parents], ['Partners', r.partners], ['Brothers and sisters', r.siblings], ['Children', r.children]].filter(([, s]) => s.size);
+    const fam = [['Parents', r.parents], ['Partners', r.partners], ['Sisters and brothers', r.siblings], ['Children', r.children]].filter(([, s]) => s.size);
     h += `<section><h3>Family</h3>${fam.length ? `<dl class="kin">${fam.map(([k, s]) => `<dt>${k}</dt><dd>${names(s)}</dd>`).join('')}</dl>` : '<p class="meta">Not joined to anyone yet.</p>'}</section>`;
     h += `<section><h3>Places in their story</h3>${places.length ? `<ul class="plain placelist">${places.map((e) => `<li><button class="link" data-act="openfromperson" data-id="${e.id}">${esc(e.title)}</button> <span class="meta">${esc(whenLabel(e))}</span></li>`).join('')}</ul>` : '<p class="meta">Not linked to any places yet.</p>'}${
       notYet.length ? `<div class="addrow"><div class="field"><label for="pp-add">Link a place to ${esc(first(pname(p)))}</label><select id="pp-add"><option value="">Choose a place…</option>${notYet.map((e) => `<option value="${e.id}">${esc(e.title)} (${esc(whenLabel(e))})</option>`).join('')}</select></div><button class="btn" data-act="linkplace" data-id="${id}">Link this place</button></div>` : ''}</section>`;
@@ -498,16 +499,16 @@ function openPerson(id, panel) {
   } else if (personPanel === 'add') {
     const others = S.people.filter((q) => q.id !== id), partners = [...r.partners].map(personById).filter(Boolean);
     h += `<form id="relform" class="field" style="gap:.9rem"><input type="hidden" id="r-target" value="${id}">
-      <fieldset><legend>Who are you adding to ${esc(first(pname(p)))}’s family?</legend><div class="relgrid">${[['parent', 'A parent'], ['partner', 'A partner or spouse'], ['child', 'A child'], ['sibling', 'A brother or sister']].map(([v, l], i) => `<label class="choice"><input type="radio" name="rel" id="rel-${v}" value="${v}"${i === 0 ? ' checked' : ''}>${l}</label>`).join('')}</div></fieldset>
+      <fieldset><legend>Who are you adding to ${esc(first(pname(p)))}’s family?</legend><div class="relgrid">${[['parent', 'A parent'], ['partner', 'A partner or spouse'], ['child', 'A child'], ['sibling', 'A sister or brother']].map(([v, l], i) => `<label class="choice"><input type="radio" name="rel" id="rel-${v}" value="${v}"${i === 0 ? ' checked' : ''}>${l}</label>`).join('')}</div></fieldset>
       ${partners.length ? `<div class="field" id="r-otherbox"><label for="r-other">For a child: who is the other parent?</label><select id="r-other"><option value="">Not sure, or nobody in the tree</option>${partners.map((q, i) => `<option value="${q.id}"${i === 0 ? ' selected' : ''}>${esc(pname(q))}</option>`).join('')}</select></div>` : ''}
       ${others.length ? `<fieldset><legend>Are they already in the family tree?</legend><label class="choice"><input type="radio" name="rwho" id="rwho-new" value="new" checked>No, add a new person</label><label class="choice"><input type="radio" name="rwho" id="rwho-old" value="old">Yes, choose them</label></fieldset>` : ''}
-      <div id="r-newbox" class="field" style="gap:.9rem">${fld('r-name', 'Their name', '', 'The name the family knew them by')}<div class="two">${fld('r-born', 'Year born', '', 'Optional. A rough year is fine.', 60)}${fld('r-died', 'Year they passed away', '', 'Optional', 60)}</div></div>
+      <div id="r-newbox" class="field" style="gap:.9rem">${fld('r-name', 'Their name', '', 'The name the family knew them by')}<div class="two">${fld('r-born', 'Year born', '', 'Optional. A rough year is fine.', 60)}${fld('r-died', 'Year they passed away', '', 'Optional', 60)}</div>${'<fieldset><legend>Woman or man?</legend><p class="hint">Optional. It lets the tree say “Sister” or “Brother” instead of both.</p>' + [['female', 'Woman'], ['male', 'Man'], ['', 'Not sure, or leave it out']].map(([v, l]) => `<label class="choice"><input type="radio" name="rsex" id="rsex-${v || 'none'}" value="${v}"${('' || '') === v ? ' checked' : ''}>${l}</label>`).join('') + '</fieldset>'}</div>
       ${others.length ? `<div id="r-oldbox" class="field" hidden><label for="r-old">Who is it?</label><select id="r-old"><option value="">Choose a person…</option>${others.map((q) => `<option value="${q.id}">${esc(pname(q))}</option>`).join('')}</select></div>` : ''}
       <div class="rowbtns"><button class="btn primary" type="submit">Add to the family</button><button class="btn" type="button" data-act="person" data-id="${id}">Cancel</button></div></form>`;
   } else {
     const links = S.links.filter((l) => l.from === id || l.to === id);
-    const describe = (l) => { const o = personById(l.from === id ? l.to : l.from); const nm = o ? pname(o) : 'someone'; if (l.kind === 'partner') return 'Partner of ' + nm; if (l.kind === 'sibling') return 'Brother or sister of ' + nm; return l.from === id ? 'Parent of ' + nm : 'Child of ' + nm; };
-    h += `<form id="personform" class="field" style="gap:.9rem"><input type="hidden" id="pe-id" value="${id}">${p.subject ? `<p class="notice">${owner() ? 'Their name and dates are changed under “Add or change places”, then “About”.' : 'Their name and dates are looked after by the person who manages this Memory Map.'}</p>` : `${fld('pe-name', 'Their name', p.name)}<div class="two">${fld('pe-born', 'Year born', p.born, 'A rough year is fine', 60)}${fld('pe-died', 'Year they passed away', p.died, 'Optional', 60)}</div>`}
+    const describe = (l) => { const o = personById(l.from === id ? l.to : l.from); const nm = o ? pname(o) : 'someone'; if (l.kind === 'partner') return 'Partner of ' + nm; if (l.kind === 'sibling') return w3(p, 'Sister or brother', 'Sister', 'Brother') + ' of ' + nm; return l.from === id ? w3(p, 'Parent', 'Mother', 'Father') + ' of ' + nm : w3(p, 'Child', 'Daughter', 'Son') + ' of ' + nm; };
+    h += `<form id="personform" class="field" style="gap:.9rem"><input type="hidden" id="pe-id" value="${id}">${p.subject ? `<p class="notice">${owner() ? 'Their name and dates are changed under “Add or change places”, then “About”.' : 'Their name and dates are looked after by the person who manages this Memory Map.'}</p>` : `${fld('pe-name', 'Their name', p.name)}<div class="two">${fld('pe-born', 'Year born', p.born, 'A rough year is fine', 60)}${fld('pe-died', 'Year they passed away', p.died, 'Optional', 60)}</div>${'<fieldset><legend>Woman or man?</legend><p class="hint">Optional. It lets the tree say “Sister” or “Brother” instead of both.</p>' + [['female', 'Woman'], ['male', 'Man'], ['', 'Not sure, or leave it out']].map(([v, l]) => `<label class="choice"><input type="radio" name="psex" id="psex-${v || 'none'}" value="${v}"${(p.sex || '') === v ? ' checked' : ''}>${l}</label>`).join('') + '</fieldset>'}`}
       <div class="field"><label for="pe-note">A few words about them</label><span class="hint">Optional. What were they like?</span><textarea id="pe-note" maxlength="1000">${esc(p.note)}</textarea></div>
       <div class="rowbtns"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="person" data-id="${id}">Cancel</button></div></form>
       ${links.length ? `<fieldset><legend>Connections</legend><p class="hint">If one of these is wrong, remove it and add it again the right way.</p>${links.map((l) => `<div class="entry"><div class="t"><b>${esc(describe(l))}</b></div><button class="btn quiet" data-act="dellink" data-id="${l.id}">Remove</button></div>`).join('')}</fieldset>` : ''}
@@ -523,7 +524,7 @@ async function addRelative() {
   if (old) { pid = $('#r-old').value; if (!pid) { $('#r-old').focus(); toast('Choose who it is first.'); return; } }
   else {
     const name = $('#r-name').value.trim(); if (!name) { $('#r-name').focus(); toast('Type their name first.'); return; }
-    const p = await store.addPerson({ name, born: $('#r-born').value.trim(), died: $('#r-died').value.trim() }); S.people.push(p); pid = p.id;
+    const sx = document.querySelector('input[name=rsex]:checked'); const p = await store.addPerson({ name, born: $('#r-born').value.trim(), died: $('#r-died').value.trim(), sex: sx ? sx.value : '' }); S.people.push(p); pid = p.id;
   }
   const other = rel === 'child' && $('#r-other') ? $('#r-other').value : '';
   const want = linksFor(rel, pid, target, famRel(), other).filter((l) => !S.links.some((x) => sameLink(x, l)));
@@ -533,7 +534,7 @@ async function addRelative() {
 async function savePerson() {
   const p = personById($('#pe-id').value); const v = (i) => { const el = $('#' + i); return el ? el.value.trim() : undefined; };
   const next = { ...p, note: v('pe-note') || '' };
-  if (!p.subject) { next.name = v('pe-name'); next.born = v('pe-born') || ''; next.died = v('pe-died') || ''; if (!next.name) { $('#pe-name').focus(); toast('Their name cannot be empty.'); return; } }
+  if (!p.subject) { const sx = document.querySelector('input[name=psex]:checked'); next.sex = sx ? sx.value : ''; next.name = v('pe-name'); next.born = v('pe-born') || ''; next.died = v('pe-died') || ''; if (!next.name) { $('#pe-name').focus(); toast('Their name cannot be empty.'); return; } }
   await store.updatePerson(next); Object.assign(p, next); renderFamily(); openPerson(p.id); toast('Saved.');
 }
 

@@ -20,7 +20,7 @@ test('partners sit side by side', () => {
 test('relationships are named from the centre person', () => {
   const R = relations(people, links), l = (id) => relationLabel(id, people, R);
   assert.deepEqual(['ted', 'helen', 'tom', 'arthur', 'joan', 'mark', 'edith', 'stray'].map(l),
-    ['Partner', 'Child', 'Grandchild', 'Parent', 'Brother or sister', 'Child’s partner', 'Parent-in-law', 'Family']);
+    ['Partner', 'Child', 'Grandchild', 'Parent', 'Sister or brother', 'Child’s partner', 'Parent-in-law', 'Family']);
 });
 test('a new brother or sister shares the parents when they are known, otherwise is joined directly', () => {
   const R = relations(people, links);
@@ -37,4 +37,9 @@ test('brothers and sisters stay together, with a partner who married in on the o
   const row = order(1); assert.equal(Math.abs(row.indexOf('joan') - row.indexOf('peggy')), 1); assert.equal(Math.abs(row.indexOf('peggy') - row.indexOf('ted')), 1);
   // Edith sits over Ted, not over Joan
   assert.ok(Math.abs(t.pos.edith.x - t.pos.ted.x) < Math.abs(t.pos.edith.x - t.pos.joan.x));
+});
+test('the word changes when we know someone is a woman or a man, and stays neutral when we do not', () => {
+  const sexed = people.map((p) => ({ ...p, sex: { joan: 'female', arthur: 'male', helen: 'female', tom: 'male', mark: 'male', edith: 'female' }[p.id] || '' }));
+  const R = relations(sexed, links), l = (id) => relationLabel(id, sexed, R);
+  assert.deepEqual(['joan', 'arthur', 'rose', 'helen', 'tom', 'mark', 'edith', 'ted'].map(l), ['Sister', 'Father', 'Parent', 'Daughter', 'Grandson', 'Son-in-law', 'Mother-in-law', 'Partner']);
 });

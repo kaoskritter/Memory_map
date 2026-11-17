@@ -62,7 +62,7 @@ await step('the example family tree draws, names relationships, and links people
   assert.ok(await nobody.locator('.famtree svg path').count() >= 8, 'lines drawn');
   await nobody.screenshot({ path: join(shots, 'family.png') });
   await nobody.click('.pcard[title="Ted Lawson"]'); await nobody.waitForSelector('#person h2');
-  assert.match(await nobody.textContent('#person'), /Partner of Peggy/); assert.match(await nobody.textContent('#person'), /Married Ted Lawson/);
+  assert.match(await nobody.textContent('#person'), /Partner of Peggy/); assert.match(await nobody.textContent('.pcard[title="Joan Hartley"]'), /Sister/); assert.match(await nobody.textContent('#person'), /Married Ted Lawson/);
   await nobody.click('#person [data-act=openfromperson] >> nth=0'); await nobody.waitForSelector('#story .chip');
   assert.match(await nobody.textContent('#story .chips'), /Ted Lawson/); await nobody.click('#story [data-act=close]');
   await nobody.click('[data-v=both]');
@@ -95,9 +95,11 @@ await step('everything is still there after reloading, including the private pho
 });
 await step('owner starts the family tree', async () => {
   await helen.click('[data-v=family]'); await helen.waitForSelector('.famtree .pcard.me'); await helen.click('.famhead [data-act=person]');
-  await helen.click('[data-act=relpanel]'); await helen.waitForSelector('#relform'); await helen.fill('#r-name', 'Arthur Hartley'); await helen.fill('#r-born', 'about 1905');
+  await helen.click('[data-act=relpanel]'); await helen.waitForSelector('#relform'); await helen.fill('#r-name', 'Arthur Hartley'); await helen.fill('#r-born', 'about 1905'); await helen.click('#rsex-male', { force: true });
   await helen.click('#relform button[type=submit]'); await helen.waitForFunction(() => document.querySelectorAll('.famtree .pcard').length === 2);
   assert.match(await helen.textContent('#person'), /Parents\s*Arthur Hartley/); await helen.click('#person [data-act=close]');
+  assert.match(await helen.textContent('.pcard[title="Arthur Hartley"]'), /Father/);
+  assert.equal((await mock.db.query(`select sex from people where name='Arthur Hartley'`)).rows[0].sex, 'male');
   const r = (await mock.db.query(`select kind from family_links`)).rows; assert.deepEqual(r, [{ kind: 'parent' }]);
   await helen.click('[data-v=both]');
 });

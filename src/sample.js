@@ -39,7 +39,7 @@ function base(){
 
 // Peggy's family, and the places each of them was part of.
 export function sample(){
-  var o=base(), id=0, P=function(name,born,died,note){var p={id:'p'+(++id),subject:false,name:name,born:born||'',died:died||'',note:note||''};o.people.push(p);return p.id};
+  var o=base(), id=0, P=function(name,born,died,note){var p={id:'p'+(++id),subject:false,name:name,born:born||'',died:died||'',note:note||'',sex:''};o.people.push(p);return p.id};
   o.people=[{id:'p0',subject:true,name:'',born:'',died:'',note:''}];
   var arthur=P('Arthur Hartley','about 1905','1971','A boilermaker at the Phoenix Foundry. Sang in the kitchen.'),
       rose=P('Rose Hartley','1908','1990','Kept chooks and four daughters in line.'),
@@ -47,6 +47,8 @@ export function sample(){
       ted=P('Ted Lawson','1935','2019','Came out from Whitby in 1957 and never quite lost the accent.'),
       edith=P('Edith Lawson','1910','1996','Ted’s mother. She and Peggy wrote to each other for twenty years.'),
       helen=P('Helen Lawson','1965','',''),mark=P('Mark Rossi','1963','',''),tom=P('Tom Rossi','1994','','');
+  var sex={};sex[arthur]='male';sex[rose]='female';sex[joan]='female';sex[ted]='male';sex[edith]='female';sex[helen]='female';sex[mark]='male';sex[tom]='male';
+  o.people.forEach(function(p){if(sex[p.id])p.sex=sex[p.id]});
   var n=0,L=function(f,t,k){o.links.push({id:'f'+(++n),from:f,to:t,kind:k})};
   o.links=[];
   L('p0',ted,'partner');L(arthur,rose,'partner');L(arthur,'p0','parent');L(rose,'p0','parent');L(arthur,joan,'parent');L(rose,joan,'parent');

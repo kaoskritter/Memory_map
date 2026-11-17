@@ -65,28 +65,30 @@ export function layout(people, links) {
   const pos = {}; rows.forEach((row, r) => row.forEach((id) => { pos[id] = { row: r, x: x[id] }; }));
   return { rows, pos, loose, gen, R };
 }
-// How someone is related to the person at the centre, in plain words. '' when it is not a simple step.
+// How someone is related to the person at the centre, in plain words. Uses "Sister" or "Brother" when we know, the neutral word when we do not.
 export function relationLabel(id, people, R) {
   const s = people.find((p) => p.subject); if (!s || !R[id]) return '';
   if (id === s.id) return '';
+  const who = people.find((p) => p.id === id), sex = who && who.sex;
+  const w = (neutral, f, m) => (sex === 'female' ? f : sex === 'male' ? m : neutral);
   const me = R[s.id], has = (set) => set.has(id), any = (set, pick) => [...set].some((o) => R[o] && pick(R[o]).has(id));
   if (has(me.partners)) return 'Partner';
-  if (has(me.parents)) return 'Parent';
-  if (has(me.children)) return 'Child';
-  if (has(me.siblings)) return 'Brother or sister';
-  if (any(me.parents, (r) => r.parents)) return 'Grandparent';
-  if (any(me.children, (r) => r.children)) return 'Grandchild';
-  if (any(me.parents, (r) => r.partners)) return 'Step-parent';
-  if (any(me.partners, (r) => r.children)) return 'Step-child';
-  if (any(me.children, (r) => r.partners)) return 'Child’s partner';
-  if (any(me.partners, (r) => r.parents)) return 'Parent-in-law';
-  if (any(me.siblings, (r) => r.partners) || any(me.partners, (r) => r.siblings)) return 'Brother- or sister-in-law';
-  if (any(me.parents, (r) => r.siblings)) return 'Aunt or uncle';
-  if (any(me.siblings, (r) => r.children)) return 'Niece or nephew';
+  if (has(me.parents)) return w('Parent', 'Mother', 'Father');
+  if (has(me.children)) return w('Child', 'Daughter', 'Son');
+  if (has(me.siblings)) return w('Sister or brother', 'Sister', 'Brother');
+  if (any(me.parents, (r) => r.parents)) return w('Grandparent', 'Grandmother', 'Grandfather');
+  if (any(me.children, (r) => r.children)) return w('Grandchild', 'Granddaughter', 'Grandson');
+  if (any(me.parents, (r) => r.partners)) return w('Step-parent', 'Stepmother', 'Stepfather');
+  if (any(me.partners, (r) => r.children)) return w('Step-child', 'Stepdaughter', 'Stepson');
+  if (any(me.children, (r) => r.partners)) return w('Child’s partner', 'Daughter-in-law', 'Son-in-law');
+  if (any(me.partners, (r) => r.parents)) return w('Parent-in-law', 'Mother-in-law', 'Father-in-law');
+  if (any(me.siblings, (r) => r.partners) || any(me.partners, (r) => r.siblings)) return w('Sister- or brother-in-law', 'Sister-in-law', 'Brother-in-law');
+  if (any(me.parents, (r) => r.siblings)) return w('Aunt or uncle', 'Aunt', 'Uncle');
+  if (any(me.siblings, (r) => r.children)) return w('Niece or nephew', 'Niece', 'Nephew');
   const grandparents = new Set(); me.parents.forEach((p) => R[p].parents.forEach((g) => grandparents.add(g)));
-  if ([...grandparents].some((g) => R[g].parents.has(id))) return 'Great-grandparent';
+  if ([...grandparents].some((g) => R[g].parents.has(id))) return w('Great-grandparent', 'Great-grandmother', 'Great-grandfather');
   const grandchildren = new Set(); me.children.forEach((c) => R[c].children.forEach((g) => grandchildren.add(g)));
-  if ([...grandchildren].some((g) => R[g].children.has(id))) return 'Great-grandchild';
+  if ([...grandchildren].some((g) => R[g].children.has(id))) return w('Great-grandchild', 'Great-granddaughter', 'Great-grandson');
   const auntsUncles = new Set(); me.parents.forEach((p) => R[p].siblings.forEach((a) => auntsUncles.add(a)));
   if ([...auntsUncles].some((a) => R[a].children.has(id))) return 'Cousin';
   return 'Family';
