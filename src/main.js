@@ -1,5 +1,9 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '@fontsource/eb-garamond/latin-500.css';
+import '@fontsource/eb-garamond/latin-600.css';
+import '@fontsource/eb-garamond/latin-500-italic.css';
+import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 import { CATS, CAT } from './categories.js';
 import { parseWhen } from './when.js';
@@ -37,7 +41,7 @@ const byId = (id) => S.events.find((e) => e.id === id);
 const owner = () => S.role === 'owner';
 const first = (name) => String(name || '').split(' ')[0] || 'them';
 function nameAt(year) { const s = S.subject; let cur = s.birthName || s.preferred; (s.changes || []).forEach((c) => { const r = parseWhen(c.year); if (r && year != null && r.from <= year && c.name) cur = c.name; }); return cur; }
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 4000); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 6000); }
 function friendly(err) {
   const m = String((err && err.message) || err || '');
   if (/Failed to fetch|NetworkError|network/i.test(m)) return 'We could not reach Memory Map. Check your internet connection and try again.';
@@ -54,7 +58,7 @@ async function run(fn) {
 /* =====================================================================
    Gate: sign in, choose or start a map
    ===================================================================== */
-function showGate(html) { document.body.dataset.screen = 'gate'; $('#gate').innerHTML = `<div class="gatecard">${html}</div>`; const f = $('#gate input, #gate button'); if (f) f.focus(); }
+function showGate(html) { document.body.dataset.screen = 'gate'; delete document.body.dataset.mode; $('#gate').innerHTML = `<div class="gatecard">${html}</div>`; const f = $('#gate input, #gate button'); if (f) f.focus(); }
 const brand = '<p class="brand">Memory Map</p>';
 function gateSignIn(msg) {
   showGate(`${brand}<h1>A life story, told through its places</h1>
@@ -119,7 +123,7 @@ function renderTop() {
   $('#top').innerHTML = `<div class="who"><h1>${title}</h1><p class="sub">${esc(sub)}${owner() ? '' : ' · You can add memories and photos'}</p></div><div class="actions">${
     S.view === 'edit' ? '<button class="btn primary" data-act="view" data-v="both">Back to the map</button>' : (owner() ? '<button class="btn primary" data-act="view" data-v="edit">Add or change places</button>' : '')}<button class="btn" data-act="settings">Settings</button></div>`;
   $('#sample').hidden = !S.demo;
-  document.body.dataset.view = S.view;
+  document.body.dataset.view = S.view; document.body.dataset.mode = S.mode;
   document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === S.view)));
   document.title = (s.preferred ? s.preferred + ' · ' : '') + 'Memory Map';
 }

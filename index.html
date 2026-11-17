@@ -5,12 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Memory Map: a life story, told through its places.">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#172A2D">
+<meta name="theme-color" content="#1B2A41">
 <title>Memory Map</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
 </head>
 <body data-screen="gate" data-view="both">
 <a class="skip" href="#tl">Skip to the timeline</a>
@@ -22,10 +19,12 @@
     <button class="btn" data-act="leavedemo">Leave the example</button>
   </div>
   <nav class="tabs" aria-label="Ways to look at the story">
-    <button class="tab" data-act="view" data-v="both">Map and timeline</button>
-    <button class="tab" data-act="view" data-v="map">Map</button>
-    <button class="tab" data-act="view" data-v="timeline">Timeline</button>
-    <button class="tab" data-act="view" data-v="photos">Photos</button>
+    <div class="segs">
+      <button class="tab" data-act="view" data-v="both">Map and timeline</button>
+      <button class="tab" data-act="view" data-v="map">Map</button>
+      <button class="tab" data-act="view" data-v="timeline">Timeline</button>
+      <button class="tab" data-act="view" data-v="photos">Photos</button>
+    </div>
     <span class="spacer"></span>
     <button class="btn quiet filtertoggle" data-act="filters" aria-expanded="false">Choose what to show</button>
   </nav>
