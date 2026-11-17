@@ -467,7 +467,8 @@ document.addEventListener('submit', (ev) => {
     const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
     if (!error) return gateSent(email);
     console.warn(error);
-    if (/rate|seconds|too many/i.test(error.message)) gateSignIn('We have just sent you an email. Please wait a minute before asking for another.');
+    if (/email rate limit/i.test(error.message)) gateSignIn('We have sent as many sign-in emails as we can for now. Please try again in about an hour.');
+    else if (/rate|seconds|too many/i.test(error.message)) gateSignIn('We have just sent you an email. Please wait a minute before asking for another.');
     else if (/invite-only|Database error|Signups not allowed|not allowed/i.test(error.message)) gateSignIn('That email address is not on the guest list yet. Ask the person who invited you to check the address they used.');
     else gateSignIn('We could not send the email just now. Please check the address and try again.');
   });
