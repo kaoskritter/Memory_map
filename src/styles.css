@@ -259,8 +259,10 @@ legend{font-weight:700;padding:0 .4rem}
   body:not(.showfilters) .filters{display:none}
   .stage{flex-direction:column;flex:none}
   .pane{flex:none}
-  .pane.mapp{height:60vh;min-height:20rem}
-  body[data-view="both"] .pane.mapp{height:45vh}
+  /* the map gets a set height and the panel grows around it, so the buttons under the map are never cut off */
+  .pane.mapp{height:auto}
+  #map{flex:none;height:60vh;min-height:18rem}
+  body[data-view="both"] #map{height:42vh}
   body[data-view="both"] .pane.tl{flex:none}
   .tlscroll{overflow:visible}
   .decade{position:static}
