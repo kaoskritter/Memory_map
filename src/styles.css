@@ -179,8 +179,8 @@ legend{font-weight:700;padding:0 .4rem}
 .field{display:flex;flex-direction:column;gap:.3rem}
 .field label,.flabel{font-weight:700}
 .field .hint{color:var(--muted);font-size:.95rem}
-.field input,.field select,.field textarea{min-height:3rem;padding:.5rem .75rem;border:1.5px solid var(--edge);border-radius:var(--r-sm);background:#fff;width:100%;box-shadow:inset 0 1px 2px rgba(27,42,65,.08)}
-.field input:hover,.field select:hover,.field textarea:hover{border-color:var(--ink)}
+.field input:not([type=radio]):not([type=checkbox]),.field select,.field textarea{min-height:3rem;padding:.5rem .75rem;border:1.5px solid var(--edge);border-radius:var(--r-sm);background:#fff;width:100%;box-shadow:inset 0 1px 2px rgba(27,42,65,.08)}
+.field input:not([type=radio]):not([type=checkbox]):hover,.field select:hover,.field textarea:hover{border-color:var(--ink)}
 .field textarea{min-height:7rem;resize:vertical}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
