@@ -154,6 +154,9 @@ body[data-view="both"] .pane.tl{flex:0 1 25rem}
 .pcard.sel{box-shadow:0 0 0 3px var(--card),0 0 0 6px var(--ink)}
 .famloose{padding:1rem 1.4rem 1.4rem;border-top:1px dashed var(--edge);display:flex;flex-direction:column;gap:.5rem}
 .famloose h3{font-size:1.3rem}
+.famfriends{padding:1rem 1.4rem 1.4rem;border-top:1px dashed var(--edge);display:flex;flex-direction:column;gap:.5rem}
+.famfriends h3{font-size:1.3rem}
+.famfriends .pcard .rl{color:var(--muted)}
 .looserow{display:flex;gap:.8rem;flex-wrap:wrap}
 .kin{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:0}
 .kin dt{font-weight:700}.kin dd{margin:0}

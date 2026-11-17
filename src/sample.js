@@ -49,15 +49,17 @@ export function sample(){
       helen=P('Helen Lawson','1965','',''),mark=P('Mark Rossi','1963','',''),tom=P('Tom Rossi','1994','','');
   var sex={};sex[arthur]='male';sex[rose]='female';sex[joan]='female';sex[ted]='male';sex[edith]='female';sex[helen]='female';sex[mark]='male';sex[tom]='male';
   o.people.forEach(function(p){if(sex[p.id])p.sex=sex[p.id]});
+  var F=function(name,note){var p={id:'p'+(++id),subject:false,kind:'friend',name:name,born:'',died:'',note:note,sex:''};o.people.push(p);return p.id};
+  var dot=F('Dot Kelly','Shared a room at teachers’ college. Bridesmaid in 1962.'),bev=F('Bev Nguyen','Sang alto beside Peggy in the Daylesford choir for thirty years.');
   var n=0,L=function(f,t,k){o.links.push({id:'f'+(++n),from:f,to:t,kind:k})};
   o.links=[];
   L('p0',ted,'partner');L(arthur,rose,'partner');L(arthur,'p0','parent');L(rose,'p0','parent');L(arthur,joan,'parent');L(rose,joan,'parent');
   L(edith,ted,'parent');L('p0',helen,'parent');L(ted,helen,'parent');L(helen,mark,'partner');L(helen,tom,'parent');L(mark,tom,'parent');
   var at=function(title,ids){var e=o.events.find(function(x){return x.title===title});if(e)e.who=ids};
   o.events.forEach(function(e){e.who=[]});
-  at('Born at the Base Hospital',[rose]);at('The weatherboard on Humffray Street',[arthur,rose,joan]);at('Married Ted Lawson',[ted,arthur,rose,joan]);
+  at('Born at the Base Hospital',[rose]);at('The weatherboard on Humffray Street',[arthur,rose,joan]);at('Married Ted Lawson',[ted,arthur,rose,joan,dot]);
   at('Electra Street, Williamstown',[ted,helen]);at('Helen was born',[helen,ted]);at('Summers at Lorne',[ted,helen]);
-  at('Trip to Whitby to meet Ted’s family',[ted,edith]);at('The house in Daylesford',[ted,tom]);at('Uluru, after retiring',[ted]);
+  at('Trip to Whitby to meet Ted’s family',[ted,edith]);at('The house in Daylesford',[ted,tom]);at('Uluru, after retiring',[ted]);at('Teachers’ college in Carlton',[dot]);at('Boarding house off Drummond Street',[dot]);at('Community choir',[bev]);
   at('The unit near Helen, Geelong',[helen,mark,tom]);at('Eastern Beach',[tom]);at('Resting place, beside Ted',[ted]);
   return o;
 }
